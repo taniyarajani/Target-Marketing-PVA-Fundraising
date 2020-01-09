@@ -3,7 +3,8 @@ Developed data mining models to improve the cost effectiveness of PVA's direct m
 
 Data The modeling dataset is in the file kdd98LRN.txt. The data has around 95K rows and 480 attributes. The target variable, on response, is in the TARGET_B column. The data set has 5.1% responders.
 
-Steps included in the project - 
+**Part 1 - Target variable is TARGET_B (to predict donors).** 
+Steps included in the part 1- 
 1. Data cleaning and exploration
   -Missing value imputation
   -Variable selection is done using Random Forest and Decision Trees
@@ -15,3 +16,12 @@ Steps included in the project -
 3. Modelling
   -Logistic Regression, using Ridge and Lasso, Random forest, Boosted trees and SVM
 4. A comparative evaluation of performance of best models from each technique is done considering confusion matrix, lift and ROC.
+(Target_D which is amount of donation is not included in part 1)
+
+**Part 2 - Target variable is TARGET_D (to amount of donation)
+Here, I have develop a model to predict donation amount (TARGET_D) directly, and examined how to combine the response and donation amount models to identify the most profitable individuals to target.**
+Steps included in the part 2-
+1. Identified the most profitable individuals to target using the response model with average donation & mailing costs information
+2. Develop a second model on TARGET_D, and combine this with the response model to identify the most profitable individuals to target
+3. well-calibrated probability scores before ‘combining’ the response and donation amount models
+
