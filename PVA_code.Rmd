@@ -1,0 +1,1728 @@
+
+---
+  title: "PVA Fundraising"
+  author: "Taniya Rajani"
+output: html_document
+---
+#Guidelines to read this code
+ This code includes part 1 till line 1030 and part 2 afterwards.
+
+```{r}
+rm(list = ls(all.names = TRUE)) 
+library(dplyr)
+library(tidyverse)
+library(ggplot2)
+library(tidyr)
+library(readr)
+library(rsample)
+library(purrr)
+library(gbm)
+library(rpart)
+```
+
+# Reading dataset and analyzing count of donors (TARGET_B) 
+```{r}
+kdd98Data <- read_csv(file.path(getwd(), "/cup98LRN.txt"))
+Originaldata <- kdd98Data
+
+#Analyzing count of TARGET_B variable
+kdd98Data %>% group_by(TARGET_B) %>% count()
+```
+
+# Removing some useless variables and separating out numerical and catgeorical variables
+```{r}
+
+drop <- c('ODATEDW', 'OSOURCE', 'ZIP', 'DOB', 'MDMAUD', 'MAXADATE', 'RDATE_3', 'RDATE_4', 'RDATE_5', 'RDATE_6', 'RDATE_7', 'RDATE_8', 'RDATE_9', 'RDATE_10', 'RDATE_11', 'RDATE_12', 'RDATE_13', 'RDATE_14', 'RDATE_15', 'RDATE_16', 'RDATE_17', 'RDATE_18', 'RDATE_19', 'RDATE_20', 'RDATE_21', 'RDATE_22', 'RDATE_23', 'RDATE_24', 'MINRDATE', 'MAXRDATE', 'LASTDATE', 'FISTDATE', 'NEXTDATE', 'CONTROLN')
+
+kdd98Data <- kdd98Data[,!(names(kdd98Data) %in% drop)]
+
+#numerical variables
+num_names <- c('AGE', 'NUMCHLD', 'INCOME', 'WEALTH1', 'HIT', 'MBCRAFT', 'MBGARDEN', 'MBBOOKS', 'MBCOLECT', 'MAGFAML', 'MAGFEM', 'MAGMALE', 'PUBGARDN', 'PUBCULIN', 'PUBHLTH', 'PUBDOITY', 'PUBNEWFN', 'PUBPHOTO', 'PUBOPP', 'MALEMILI', 'MALEVET', 'VIETVETS', 'WWIIVETS', 'LOCALGOV', 'STATEGOV', 'FEDGOV', 'MAJOR', 'WEALTH2', 'GEOCODE', 'LIFESRC', 'POP901', 'POP902', 'POP903', 'POP90C1', 'POP90C2', 'POP90C3', 'POP90C4', 'POP90C5', 'ETH1', 'ETH2', 'ETH3', 'ETH4', 'ETH5', 'ETH6', 'ETH7', 'ETH8', 'ETH9', 'ETH10', 'ETH11', 'ETH12', 'ETH13', 'ETH14', 'ETH15', 'ETH16', 'AGE901', 'AGE902', 'AGE903', 'AGE904', 'AGE905', 'AGE906', 'AGE907', 'CHIL1', 'CHIL2', 'CHIL3', 'AGEC1', 'AGEC2', 'AGEC3', 'AGEC4', 'AGEC5', 'AGEC6', 'AGEC7', 'CHILC1', 'CHILC2', 'CHILC3', 'CHILC4', 'CHILC5', 'HHAGE1', 'HHAGE2', 'HHAGE3', 'HHN1', 'HHN2', 'HHN3', 'HHN4', 'HHN5', 'HHN6', 'MARR1', 'MARR2', 'MARR3', 'MARR4', 'HHP1', 'HHP2', 'DW1', 'DW2', 'DW3', 'DW4', 'DW5', 'DW6', 'DW7', 'DW8', 'DW9', 'HV1', 'HV2', 'HV3', 'HV4', 'HU1', 'HU2', 'HU3', 'HU4', 'HU5', 'HHD1', 'HHD2', 'HHD3', 'HHD4', 'HHD5', 'HHD6', 'HHD7', 'HHD8', 'HHD9', 'HHD10', 'HHD11', 'HHD12', 'ETHC1', 'ETHC2', 'ETHC3', 'ETHC4', 'ETHC5', 'ETHC6', 'HVP1', 'HVP2', 'HVP3', 'HVP4', 'HVP5', 'HVP6', 'HUR1', 'HUR2', 'RHP1', 'RHP2', 'RHP3', 'RHP4', 'HUPA1', 'HUPA2', 'HUPA3', 'HUPA4', 'HUPA5', 'HUPA6', 'HUPA7', 'RP1', 'RP2', 'RP3', 'RP4', 'IC1', 'IC2', 'IC3', 'IC4', 'IC5', 'IC6', 'IC7', 'IC8', 'IC9', 'IC10', 'IC11', 'IC12', 'IC13', 'IC14', 'IC15', 'IC16', 'IC17', 'IC18', 'IC19', 'IC20', 'IC21', 'IC22', 'IC23', 'HHAS1', 'HHAS2', 'HHAS3', 'HHAS4', 'MC1', 'MC2', 'MC3', 'TPE1', 'TPE2', 'TPE3', 'TPE4', 'TPE5', 'TPE6', 'TPE7', 'TPE8', 'TPE9', 'PEC1', 'PEC2', 'TPE10', 'TPE11', 'TPE12', 'TPE13', 'LFC1', 'LFC2', 'LFC3', 'LFC4', 'LFC5', 'LFC6', 'LFC7', 'LFC8', 'LFC9', 'LFC10', 'OCC1', 'OCC2', 'OCC3', 'OCC4', 'OCC5', 'OCC6', 'OCC7', 'OCC8', 'OCC9', 'OCC10', 'OCC11', 'OCC12', 'OCC13', 'EIC1', 'EIC2', 'EIC3', 'EIC4', 'EIC5', 'EIC6', 'EIC7', 'EIC8', 'EIC9', 'EIC10', 'EIC11', 'EIC12', 'EIC13', 'EIC14', 'EIC15', 'EIC16', 'OEDC1', 'OEDC2', 'OEDC3', 'OEDC4', 'OEDC5', 'OEDC6', 'OEDC7', 'EC1', 'EC2', 'EC3', 'EC4', 'EC5', 'EC6', 'EC7', 'EC8', 'SEC1', 'SEC2', 'SEC3', 'SEC4', 'SEC5', 'AFC1', 'AFC2', 'AFC3', 'AFC4', 'AFC5', 'AFC6', 'VC1', 'VC2', 'VC3', 'VC4', 'ANC1', 'ANC2', 'ANC3', 'ANC4', 'ANC5', 'ANC6', 'ANC7', 'ANC8', 'ANC9', 'ANC10', 'ANC11', 'ANC12', 'ANC13', 'ANC14', 'ANC15', 'POBC1', 'POBC2', 'LSC1', 'LSC2', 'LSC3', 'LSC4', 'VOC1', 'VOC2', 'VOC3', 'HC1', 'HC2', 'HC3', 'HC4', 'HC5', 'HC6', 'HC7', 'HC8', 'HC9', 'HC10', 'HC11', 'HC12', 'HC13', 'HC14', 'HC15', 'HC16', 'HC17', 'HC18', 'HC19', 'HC20', 'HC21', 'MHUC1', 'MHUC2', 'AC1', 'AC2', 'CARDPROM', 'NUMPROM', 'CARDPM12', 'NUMPRM12', 'RAMNT_3', 'RAMNT_4', 'RAMNT_5', 'RAMNT_6', 'RAMNT_7', 'RAMNT_8', 'RAMNT_9', 'RAMNT_10', 'RAMNT_11', 'RAMNT_12', 'RAMNT_13', 'RAMNT_14', 'RAMNT_15', 'RAMNT_16', 'RAMNT_17', 'RAMNT_18', 'RAMNT_19', 'RAMNT_20', 'RAMNT_21', 'RAMNT_22', 'RAMNT_23', 'RAMNT_24', 'RAMNTALL', 'NGIFTALL', 'CARDGIFT', 'MINRAMNT', 'MAXRAMNT', 'LASTGIFT', 'TIMELAG', 'AVGGIFT', 'TARGET_B', 'CLUSTER2')
+
+#Categorical variables
+cat_names <-  c('TCODE', 'STATE', 'MAILCODE', 'PVASTATE', 'NOEXCH', 'RECINHSE', 'RECP3', 'RECPGVG', 'RECSWEEP', 'DOMAIN', 'CLUSTER', 'AGEFLAG', 'HOMEOWNR', 'CHILD03', 'CHILD07', 'CHILD12', 'CHILD18', 'GENDER', 'DATASRCE', 'SOLP3', 'SOLIH', 'COLLECT1', 'VETERANS', 'BIBLE', 'CATLG', 'HOMEE', 'PETS', 'CDPLAY', 'STEREO', 'PCOWNERS', 'PHOTO', 'CRAFTS', 'FISHER', 'GARDENIN', 'BOATS', 'WALKER', 'KIDSTUFF', 'CARDS', 'PLATES', 'PEPSTRFL', 'MSA', 'ADI', 'DMA', 'ADATE_2', 'ADATE_3', 'ADATE_4', 'ADATE_5', 'ADATE_6', 'ADATE_7', 'ADATE_8', 'ADATE_9', 'ADATE_10', 'ADATE_11', 'ADATE_12', 'ADATE_13', 'ADATE_14', 'ADATE_15', 'ADATE_16', 'ADATE_17', 'ADATE_18', 'ADATE_19', 'ADATE_20', 'ADATE_21', 'ADATE_22', 'ADATE_23', 'ADATE_24', 'RFA_2', 'RFA_3', 'RFA_4', 'RFA_5', 'RFA_6', 'RFA_7', 'RFA_8', 'RFA_9', 'RFA_10', 'RFA_11', 'RFA_12', 'RFA_13', 'RFA_14', 'RFA_15', 'RFA_16', 'RFA_17', 'RFA_18', 'RFA_19', 'RFA_20', 'RFA_21', 'RFA_22', 'RFA_23', 'RFA_24', 'HPHONE_D', 'RFA_2R', 'RFA_2F', 'RFA_2A', 'MDMAUD_R', 'MDMAUD_F', 'MDMAUD_A', 'GEOCODE2')
+
+num_data <- kdd98Data[,num_names]
+cat_data <- kdd98Data[,cat_names]
+
+missing_value_num <- colMeans(is.na(num_data))[colMeans(is.na(num_data))>0]
+length(missing_value_num)
+#46 missing values in numeric data
+
+#removing more than 80% missing in numeric
+names_num_8 <- names(num_data)[colMeans(is.na(num_data))>0.80]
+
+# removing numerical variables with more than 80% missing data
+num_data1 <- num_data %>% select(-names_num_8)
+missing_value_num1 <- colMeans(is.na(num_data1))[colMeans(is.na(num_data1))>0]
+#left with 27 missing in numeric
+
+# Replacing the NAs of rest numerical with median
+num_data1<- num_data1 %>% mutate_at(names(missing_value_num1), ~replace_na(., median(., na.rm=TRUE)))
+
+num_data1$NUMCHLD <- kdd98Data$NUMCHLD
+num_data1$NUMCHLD[is.na(num_data1$NUMCHLD)] <- 0
+```
+
+# Missing Value Imputation for Categorical Variables
+```{r}
+missing_value_cat <- colMeans(is.na(cat_data))[colMeans(is.na(cat_data))>0]
+length(missing_value_cat)
+#86 missing in cat
+
+# Missing Value for some categorical
+cat_data1 <- cat_data %>% mutate(MAILCODE = if_else(MAILCODE == "B", "0", "1", "1"))
+cat_data1 <- cat_data1 %>% mutate(NOEXCH = if_else(NOEXCH == "X", "0", "1", "1"))
+cat_data1 <- cat_data1 %>% mutate(RECINHSE=if_else(RECINHSE=='X', "1", "0", "0"))
+cat_data1 <- cat_data1 %>% mutate(RECP3=if_else(RECP3=='X', "1", "0", "0"))
+cat_data1 <- cat_data1 %>% mutate(RECPGVG=if_else(RECPGVG=='X', "1", "0", "0"))
+cat_data1 <- cat_data1 %>% mutate(RECSWEEP=if_else(RECSWEEP=='X', "1", "0", "0"))
+
+# Breaking domain into two and replacing missing value by Mode
+cat_data1$DOMAIN_1 = substr(cat_data1$DOMAIN, 1,1)
+cat_data1$DOMAIN_2 = substr(cat_data1$DOMAIN, 2,2)
+cat_data1$DOMAIN_1[is.na(cat_data1$DOMAIN_1)] <- "S"
+cat_data1$DOMAIN_2[is.na(cat_data1$DOMAIN_2)] <- 2
+
+#removing DOMAIN
+cat_data1 <- cat_data1 %>% select(-c("DOMAIN"))
+
+# Creating new label as missing for some
+cat_data1 <- cat_data1 %>% mutate_at(c('CLUSTER', 'AGEFLAG', "COLLECT1", "VETERANS", "BIBLE", "CATLG", "HOMEE", "PETS", "CDPLAY", "STEREO", "PCOWNERS", "PHOTO", "CRAFTS", "FISHER", "GARDENIN", "BOATS", "WALKER", "KIDSTUFF", "CARDS", "PLATES"),  ~replace_na(., "missing"))
+
+# Homeowner as 0 if missing
+cat_data1 <- cat_data1 %>% mutate(HOMEOWNR=if_else(HOMEOWNR=='H', "1", "0", "0"))
+
+# Gender variable transformation
+cat_data1$GENDER[cat_data1$GENDER=="A"] <- "U"
+cat_data1$GENDER[cat_data1$GENDER=="C"] <- "U"
+cat_data1$GENDER[cat_data1$GENDER=="J"] <- "U"
+cat_data1$GENDER[is.na(cat_data1$GENDER)] <- "U"
+
+cat_data1 <- cat_data1 %>% mutate(PEPSTRFL=if_else(PEPSTRFL=='X', "1", "0", "0"))
+
+# Removing all except ADATE_2 as want to keep latest (Discussed in Class)
+cat_data1 <- cat_data1 %>% select(- matches("ADATE_[3-9]|ADATE_[0-9][0-9]"))
+
+# Transforming variable ADATE_2
+cat_data1$ADATE_2 <- substr(cat_data1$ADATE_2, 3,4)
+
+# Removing all except RFA_2 as want to keep latest (Discussed in Class)
+cat_data1 <- cat_data1 %>% select(- matches("RFA_[3-9]|RFA_[0-9][0-9]"))
+
+# Transforming variable RFA_2 (taking 2nd and 3rd byte and these will be part of numeric data)
+cat_data1$RFA_2_A <- as.numeric(substr(cat_data1$RFA_2, 2,2))
+cat_data1$RFA_2_B <- substr(cat_data1$RFA_2, 3,3)
+
+# Replacing RFA_2B with avg of range given in data dictionary
+cat_data1$RFA_2_B[cat_data1$RFA_2_B=="D"] <- 7.5
+cat_data1$RFA_2_B[cat_data1$RFA_2_B=="E"] <- 12.5
+cat_data1$RFA_2_B[cat_data1$RFA_2_B=="F"] <- 20
+cat_data1$RFA_2_B[cat_data1$RFA_2_B=="G"] <- 25
+
+cat_data1 <- cat_data1 %>% select(-c("RFA_2"))
+
+#replacing null and blank with missing
+# trimws(cat_data1$GEOCODE2, which = c("both"))
+cat_data1$GEOCODE2[cat_data1$GEOCODE2==""] <- "missing"
+cat_data1$GEOCODE2[is.na(cat_data1$GEOCODE2)] <- "missing"
+
+cat_data1 %>% group_by(GEOCODE2) %>% summarise(n=n()) 
+
+cat_data1 <- cat_data1 %>% mutate(MDMAUD_R=if_else(MDMAUD_R=='C', "1", "0", "0"))
+
+cat_data1$MDMAUD_A[cat_data1$MDMAUD_A=="L"] <- 100
+cat_data1$MDMAUD_A[cat_data1$MDMAUD_A=="C"] <- 250
+cat_data1$MDMAUD_A[cat_data1$MDMAUD_A=="M"] <- 750
+cat_data1$MDMAUD_A[cat_data1$MDMAUD_A=="T"] <- 1000
+cat_data1$MDMAUD_A[cat_data1$MDMAUD_A=="X"] <- 0
+cat_data1$MDMAUD_F[cat_data1$MDMAUD_F=="X"] <- 0
+
+
+# Removing decided categorical columns which have many missing and are not of use
+rem_cat_f <- c('PVASTATE', 'CHILD03', 'CHILD07', 'CHILD12', 'CHILD18', 'DATASRCE', 'SOLP3', 'SOLIH', 'COLLECT1', 'MSA', 'ADI', 'DMA', 'RFA_2A', 'RFA_2R', 'RFA_2F')
+
+cat_data1 <- cat_data1[, !(names(cat_data1) %in%rem_cat_f)]
+
+# Cat Vars in cat_num1 which can be treated as numerical
+num_cat <- c("MAILCODE", "NOEXCH", "RECINHSE", "RECP3", "RECPGVG", "RECSWEEP", "DOMAIN_2", "HOMEOWNR", "PEPSTRFL", "RFA_2_A", "RFA_2_B", "MDMAUD_F", "HPHONE_D")
+
+var_onehot <- c('TCODE', 'STATE', 'CLUSTER', 'AGEFLAG', 'GENDER', 'VETERANS', 'BIBLE', 'CATLG', 'HOMEE', 'PETS', 'CDPLAY', 'STEREO', 'PCOWNERS', 'PHOTO', 'CRAFTS', 'FISHER', 'GARDENIN', 'BOATS', 'WALKER', 'KIDSTUFF', 'CARDS', 'PLATES', 'ADATE_2', 'MDMAUD_R', 'GEOCODE2', "DOMAIN_1")
+```
+
+# Some more variable transformation
+```{r}
+library(caret)
+# Making sure numeric is numeric
+num_data2 <- data.frame(lapply(cat_data1[,num_cat], as.numeric))
+
+# One Hot Encoding
+dummy <- dummyVars(" ~ .", data = cat_data1[,var_onehot])
+dummy_cat <- data.frame(predict(dummy, newdata = cat_data1[,var_onehot]))
+
+# Combining all the data
+
+data_corr <- data.frame(num_data1, num_data2)
+data_combined <- data.frame(num_data1, num_data2, dummy_cat)
+data_combined$TARGET_B <- as.numeric(data_combined$TARGET_B)
+
+data_corr1 <- data_corr %>% select(-c("TARGET_B"))
+
+#removing correlated variables
+zv <- apply(data_corr1, 2, function(x) length(unique(x)) == 1)
+dfr <- data_corr1[, !zv]
+n=length(colnames(dfr))
+
+correlationMatrix <- cor(dfr[,1:n],use="complete.obs")
+highlyCorrelated <- findCorrelation(correlationMatrix, cutoff=(0.8),verbose = FALSE)
+important_var=colnames(data_corr1[,-highlyCorrelated])
+important_var_data <- data_corr1 %>% select(important_var)
+
+data_combined <- cbind(important_var_data, dummy_cat, data_corr$TARGET_B)
+colnames(data_combined)[colnames(data_combined)=="data_corr$TARGET_B"] <- "TARGET_B"
+```
+
+# Building Decision tree for variable selection
+```{r}
+
+#splitting data
+
+set.seed(100)
+nr<-nrow(data_combined)
+trnIndex<- sample(1:nr, size = round(0.7*nr), replace=FALSE)
+Trn_data1 <- data_combined[trnIndex, ]
+Tst_data1 <- data_combined[-trnIndex, ]
+
+set.seed(100)
+DT_varSelect <- rpart(TARGET_B~., data=Trn_data1, method="class", parms = list(split = "information"), control = rpart.control(cp=0.0001, minsplit = 30))
+
+Imp_var_DT <- DT_varSelect$variable.importance
+length(Imp_var_DT)
+
+#Evaluating performance on training
+pred_DT_varSelect = predict(DT_varSelect,Trn_data1, type='class')
+table(pred = pred_DT_varSelect, true=Trn_data1$TARGET_B)
+accuracy_DT_varSelect <- mean(predict(DT_varSelect,Trn_data1,type='class')==Trn_data1$TARGET_B)
+#95.3% accuracy
+
+#Evaluating performance on testing
+pred_DT_varSelect = predict(DT_varSelect,Tst_data1, type='class')
+table(pred = pred_DT_varSelect, true=Tst_data1$TARGET_B)
+accuracy_DT_varSelect <- mean(predict(DT_varSelect,Tst_data1,type='class')==Tst_data1$TARGET_B)
+#93.3% accuracy
+
+library(rpart.plot)
+prp(DT_varSelect,type=2,extra=1)
+DT_varSelect$variable.importance %>% View()
+barplot(t(DT_varSelect$variable.importance),horiz=FALSE)
+Imp_var_DT <- data.frame(DT_varSelect$variable.importance[1:100])
+selected_var_DT <- rownames(Imp_var_DT)
+```
+
+#Building Random Forest for variable selection
+```{r}
+
+library(ranger)
+rf_1 <- ranger(as.factor(TARGET_B)~., data = Trn_data1, num.tree = 100, mtry = 10, importance= "permutation")
+summary(rf_1)
+
+confusion_matrix_RF <- rf_1$confusion.matrix
+
+varimp_RF <- data.frame(importance_pvalues(rf_1))
+varimp_RF[order(-varimp_RF$importance),]
+a <- varimp_RF[varimp_RF$pvalue < 0.05,]
+a <- a[order(-a$importance),]
+selected_var_RF <- rownames(a[1:100,])
+```
+
+# Taking union of subsets selected from Decision Tree and Random Forest
+```{r}
+#Taking union of variables subsets selected from Decision tree and GBM
+union_data_var <- union(selected_var_RF,selected_var_DT)
+union_data <- data_combined %>% select(union_data_var)
+
+#analyzing these 124 union variables
+library(broom)
+#linear model 
+linear_model_data <- cbind(union_data,data_combined$TARGET_B)
+
+#changing TARGET_B variable name
+colnames(linear_model_data)[colnames(linear_model_data)=="data_combined$TARGET_B"] <- "TARGET_B"
+linear_mod_4var <- lm(TARGET_B~.,data= linear_model_data)
+summary(linear_mod_4var)
+
+# Extracting significant variables with p value less than 0.05 using library broom
+
+tm <- tidy(linear_mod_4var)
+signi_vars <- tm$term[tm$p.value < 0.05]
+signi_vars <- signi_vars[2:16]
+
+# Data for making pca (variables which are not significant)
+data_pca <- union_data %>% select(-signi_vars)
+```
+
+# Building PCA for final variable selection
+```{r}
+data_pca_f <- data.frame(data_pca)
+PCA_input_data <- data_pca_f
+
+library(kernlab)
+library(purrr)
+nn_pn<-colnames(PCA_input_data %>% select_if(negate(is.numeric)))
+
+PCA_comp <- prcomp(PCA_input_data, scale = TRUE,center = TRUE)
+Components <- PCA_comp$rotation
+#write.csv(data.frame(Components),file = 'D:/IDS 572/Assgn 2/PCA/components.csv',sep = ",")
+plot(PCA_comp)
+
+screeplot(PCA_comp, type = "l", npcs = 50, main = "Screeplot of the first 10 PCs")
+abline(h = 1, col="red", lty=5)
+legend("topright", legend=c("Eigenvalue = 1"),
+       col=c("red"), lty=5, cex=0.6)
+
+#Thus, finalizing 10 PC
+###Final variables from PCA
+
+var_after_PCA <- data.frame(as.matrix(PCA_input_data) %*% as.matrix(Components[,1:10]))
+```
+
+# Balancing data using under-sampling and over-sampling or combination of these
+```{r}
+Final_data_modelling <- data.frame(union_data[, signi_vars], var_after_PCA, kdd98Data$TARGET_B)
+
+#changing TARGET_B variable name
+colnames(Final_data_modelling)[colnames(Final_data_modelling)=="kdd98Data.TARGET_B"] <- "TARGET_B"
+
+data_f <- Final_data_modelling
+
+#Split data into training, test subsets,  and then balance the training data
+set.seed(100)
+nr<-nrow(data_f)
+trnIndex<- sample(1:nr, size = round(0.7*nr), replace=FALSE)
+Trn_data <- data_f[trnIndex, ]
+Tst_data <- data_f[-trnIndex, ]
+
+#balancing the training data
+library(ROSE)
+Trn_data %>% group_by(TARGET_B) %>% count()
+
+#Undersampling majority class with 80% majority and 20% minority (currently minority is 5%)
+
+underSamp <- ovun.sample(TARGET_B ~., data=as.data.frame(Trn_data), na.action = na.pass, method = "under", p=0.2)$data
+underSamp %>% group_by(TARGET_B) %>% count()
+Tst_data %>% group_by(TARGET_B) %>% count()
+
+#balancing class with 50% each class
+BalSamp <- ovun.sample(TARGET_B ~., data=as.data.frame(Trn_data), na.action = na.pass, method = "both", p=0.5)$data
+BalSamp %>% group_by(TARGET_B) %>% count()
+
+#oversample majority class with each class (40% TARGET_B)
+overSamp <- ovun.sample(TARGET_B ~., data=as.data.frame(Trn_data), na.action = na.pass, method = "over", p=0.4)$data
+overSamp %>% group_by(TARGET_B) %>% count()
+```
+
+# Building logistic regression with ridge with under sampled data
+```{r}
+#develop a glm model with ridge regression with undersampled data
+library(glmnet)
+library(tidyverse)
+LR_model_ridge<-cv.glmnet(data.matrix(underSamp %>% select(-TARGET_B)), underSamp$TARGET_B, alpha = 0, family="binomial")
+
+Ridge_model_1 <- glmnet(data.matrix(underSamp %>% select(-TARGET_B)), underSamp$TARGET_B, alpha = 0, family="binomial",lambda = LR_model_ridge$lambda.min)
+
+coef(Ridge_model_1)
+summary(Ridge_model_1)
+
+data_x_ridge <- model.matrix(TARGET_B~.,underSamp)[,-1]
+probabilities <- Ridge_model_1 %>% predict(newx = data_x_ridge)
+probabilities.classes <- ifelse(probabilities>0.5,1,0)
+mean(probabilities.classes == underSamp$TARGET_B)
+#79.9
+
+#testing performance
+data_y_ridge <- model.matrix(TARGET_B~.,Tst_data)[,-1]
+probabilities <- Ridge_model_1 %>% predict(newx = data_y_ridge)
+probabilities.classes <- ifelse(probabilities>0.5,1,0)
+mean(probabilities.classes == Tst_data$TARGET_B)
+#94
+table(pred = probabilities.classes, true = Tst_data$TARGET_B)
+#all zero
+```
+
+# Tuning parameters for glm model with ridge regression with under sampled data
+```{r}
+Ridge_model_2 <- glmnet(data.matrix(underSamp %>% select(-TARGET_B)), underSamp$TARGET_B, alpha = 0, family="binomial",lambda = 0.0008)
+
+coef(Ridge_model_2)
+summary(Ridge_model_2)
+
+data_x_ridge2 <- model.matrix(TARGET_B~.,underSamp)[,-1]
+probabilities <- Ridge_model_2 %>% predict(newx = data_x_ridge2)
+probabilities.classes <- ifelse(probabilities>0.5,1,0)
+mean(probabilities.classes == underSamp$TARGET_B)
+#79.9
+table(pred = probabilities.classes, true = underSamp$TARGET_B)
+
+#testing performance
+data_y_ridge2 <- model.matrix(TARGET_B~.,Tst_data)[,-1]
+probabilities <- Ridge_model_2 %>% predict(newx = data_y_ridge2)
+probabilities.classes <- ifelse(probabilities>0.5,1,0)
+mean(probabilities.classes == Tst_data$TARGET_B)
+#94%
+table_ridge_2 = table(pred = probabilities.classes, true = Tst_data$TARGET_B)
+#all zero
+#We chose lambda value greater than the minimum lamda which we got from first model. Testing performance was almost the same. 
+```
+
+# Develop a glm model with ridge regression with balanced sampled data
+```{r}
+#develop a glm model with ridge regression with balanced sampled data
+LR_model_ridge_bs_1<-cv.glmnet(data.matrix(BalSamp %>% select(-TARGET_B)), BalSamp$TARGET_B, alpha = 0, family="binomial")
+
+Ridge_model_2_1 <- glmnet(data.matrix(BalSamp %>% select(-TARGET_B)), BalSamp$TARGET_B, alpha = 0, family="binomial",lambda = LR_model_ridge_bs_1$lambda.min)
+
+coef(Ridge_model_2_1)
+summary(Ridge_model_2_1)
+
+data_x_ridge2_1 <- model.matrix(TARGET_B~.,BalSamp)[,-1]
+probabilities_1_trn <- Ridge_model_2_1 %>% predict(newx = data_x_ridge2_1)
+probabilities.classes_1 <- ifelse(probabilities_1_trn>0.5,1,0)
+mean(probabilities.classes_1 == BalSamp$TARGET_B)
+#55.51%
+table(pred = probabilities.classes_1, true = BalSamp$TARGET_B)
+#captuirng both
+
+#testing performance
+data_y_ridge2_1 <- model.matrix(TARGET_B~.,Tst_data)[,-1]
+probabilities_1_tst <- Ridge_model_2_1 %>% predict(newx = data_y_ridge2_1)
+probabilities.classes_1 <- ifelse(probabilities_1_tst>0.5,1,0)
+mean(probabilities.classes_1 == Tst_data$TARGET_B)
+#85%
+table_ridge_1 = table(pred = probabilities.classes_1, true = Tst_data$TARGET_B)
+#capturing both
+```
+
+#Developing glm model with ridge regression with oversample data 
+```{r}
+LR_model_ridge_os<-cv.glmnet(data.matrix(overSamp %>% select(-TARGET_B)), overSamp$TARGET_B, alpha = 0, family="binomial")
+
+Ridge_model_3 <- glmnet(data.matrix(overSamp %>% select(-TARGET_B)), overSamp$TARGET_B, alpha = 0, family="binomial",lambda = LR_model_ridge_os$lambda.min)
+
+coef(Ridge_model_3)
+summary(Ridge_model_3)
+
+data_x_ridge3 <- model.matrix(TARGET_B~.,overSamp)[,-1]
+probabilities <- Ridge_model_3 %>% predict(newx = data_x_ridge3)
+probabilities.classes <- ifelse(probabilities>0.5,1,0)
+mean(probabilities.classes == overSamp$TARGET_B)
+#60.6%
+table(pred = probabilities.classes, true = overSamp$TARGET_B)
+
+#testing performance
+data_y_ridge3 <- model.matrix(TARGET_B~.,Tst_data)[,-1]
+probabilities <- Ridge_model_3 %>% predict(newx = data_y_ridge3)
+probabilities.classes <- ifelse(probabilities>0.5,1,0)
+mean(probabilities.classes == Tst_data$TARGET_B)
+#94.77%
+table(pred = probabilities.classes, true = Tst_data$TARGET_B)
+#capturing both but less 1
+```
+
+# Logistic regression with LASSO on undersampled data
+```{r}
+LR_LASSO = cv.glmnet(data.matrix(underSamp %>% select(-TARGET_B)), underSamp$TARGET_B, family = "binomial", alpha = 1)
+
+LASSO_model <- glmnet(data.matrix(underSamp %>% select(-TARGET_B)), underSamp$TARGET_B, alpha = 1, family="binomial",lambda = LR_LASSO$lambda.min)
+
+coef(LASSO_model)
+summary(LASSO_model)
+data_x_LASSO <- model.matrix(TARGET_B~.,underSamp)[,-1]
+probabilities <- LASSO_model %>% predict(newx = data_x_LASSO)
+probabilities.classes <- ifelse(probabilities>0.5,1,0)
+mean(probabilities.classes == underSamp$TARGET_B)
+#79.9
+
+#testing performance
+data_y_LASSO <- model.matrix(TARGET_B~.,Tst_data)[,-1]
+probabilities <- LASSO_model %>% predict(newx = data_y_LASSO)
+probabilities.classes <- ifelse(probabilities>0.5,1,0)
+mean(probabilities.classes == Tst_data$TARGET_B)
+#94
+table(pred = probabilities.classes, true = Tst_data$TARGET_B)
+#all zero
+```
+
+# Tuning parameters of LASSO for undersampled data
+```{r}
+LASSO_model2 <- glmnet(data.matrix(underSamp %>% select(-TARGET_B)), underSamp$TARGET_B, alpha = 1, family="binomial",lambda = 0.0005)
+
+coef(LASSO_model2)
+summary(LASSO_model2)
+data_x_LASSO2 <- model.matrix(TARGET_B~.,underSamp)[,-1]
+probabilities <- LASSO_model2 %>% predict(newx = data_x_LASSO2)
+probabilities.classes <- ifelse(probabilities>0.5,1,0)
+mean(probabilities.classes == underSamp$TARGET_B)
+#79.9
+
+#testing performance
+data_y_LASSO2 <- model.matrix(TARGET_B~.,Tst_data)[,-1]
+probabilities <- LASSO_model2 %>% predict(newx = data_y_LASSO2)
+probabilities.classes <- ifelse(probabilities>0.5,1,0)
+mean(probabilities.classes == Tst_data$TARGET_B)
+#94
+table(pred = probabilities.classes, true = Tst_data$TARGET_B)
+#all zero
+#We choose a slightly bigger value of minimum lambda, which we got from first model and ran LASSO again there was not much difference seen in the result
+```
+
+# Logistic regression with LASSO on balanced sampled data
+```{r}
+LR_LASSO2 = cv.glmnet(data.matrix(BalSamp %>% select(-TARGET_B)), BalSamp$TARGET_B, family = "binomial", alpha = 1)
+
+LASSO_model2 <- glmnet(data.matrix(BalSamp %>% select(-TARGET_B)), BalSamp$TARGET_B, alpha = 1, family="binomial",lambda = LR_LASSO$lambda.min)
+
+coef(LASSO_model2)
+summary(LASSO_model2)
+data_x_LASSO2 <- model.matrix(TARGET_B~.,BalSamp)[,-1]
+prob_LASS_trn1 <- LASSO_model2 %>% predict(newx = data_x_LASSO2)
+probabilities.classes <- ifelse(prob_LASS_trn>0.5,1,0)
+mean(probabilities.classes == BalSamp$TARGET_B)
+#55.2
+
+#testing performance
+data_y_LASSO2 <- model.matrix(TARGET_B~.,Tst_data)[,-1]
+prob_LASS_tst1 <- LASSO_model2 %>% predict(newx = data_y_LASSO2)
+probabilities.classes <- ifelse(prob_LASS_tst>0.5,1,0)
+mean(probabilities.classes == Tst_data$TARGET_B)
+#85
+table(pred = probabilities.classes, true = Tst_data$TARGET_B)
+#both
+```
+
+# Tuning parameters of LASSO for balanded sample data
+```{r}
+LASSO_model3 <- glmnet(data.matrix(BalSamp %>% select(-TARGET_B)), BalSamp$TARGET_B, alpha = 1, family="binomial",lambda = 0.0005)
+
+coef(LASSO_model3)
+summary(LASSO_model3)
+data_x_LASSO3 <- model.matrix(TARGET_B~.,BalSamp)[,-1]
+prob_LASS_trn <- LASSO_model3 %>% predict(newx = data_x_LASSO3)
+probabilities.classes <- ifelse(prob_LASS_trn1>0.5,1,0)
+mean(probabilities.classes == BalSamp$TARGET_B)
+#55.1
+
+#testing performance
+data_y_LASSO3 <- model.matrix(TARGET_B~.,Tst_data)[,-1]
+prob_LASS_tst <- LASSO_model3 %>% predict(newx = data_y_LASSO3)
+probabilities.classes <- ifelse(prob_LASS_tst1>0.5,1,0)
+mean(probabilities.classes == Tst_data$TARGET_B)
+#84.8
+table(pred = probabilities.classes, true = Tst_data$TARGET_B)
+#both
+```
+
+# Developing Logistic regression with LASSO on over sampled data
+```{r}
+# Logistic regression with LASSO on over sampled data
+
+LR_LASSO3 = cv.glmnet(data.matrix(overSamp %>% select(-TARGET_B)), overSamp$TARGET_B, family = "binomial", alpha = 1)
+
+LASSO_model3 <- glmnet(data.matrix(overSamp %>% select(-TARGET_B)), overSamp$TARGET_B, alpha = 1, family="binomial",lambda = LR_LASSO$lambda.min)
+
+coef(LASSO_model3)
+summary(LASSO_model3)
+data_x_LASSO3 <- model.matrix(TARGET_B~.,overSamp)[,-1]
+probabilities <- LASSO_model3 %>% predict(newx = data_x_LASSO3)
+probabilities.classes <- ifelse(probabilities>0.5,1,0)
+mean(probabilities.classes == overSamp$TARGET_B)
+#60.12
+
+#testing performance
+data_y_LASSO3 <- model.matrix(TARGET_B~.,Tst_data)[,-1]
+probabilities <- LASSO_model3 %>% predict(newx = data_y_LASSO3)
+probabilities.classes <- ifelse(probabilities>0.5,1,0)
+mean(probabilities.classes == Tst_data$TARGET_B)
+#94
+table(pred = probabilities.classes, true = Tst_data$TARGET_B)
+#both
+```
+
+# Building Random Forest on under sampled data 
+```{r}
+library(ranger)
+#On under sampled data
+rf_2a<- ranger(as.factor(TARGET_B)~., data = underSamp, num.trees = 100, mtry = 10, importance= "permutation")
+pred_rf_2a <- predict(rf_2a, data = underSamp)
+mean(pred_rf_2a$predictions == underSamp$TARGET_B)
+#100%
+table(pred_rf_2a$predictions, underSamp$TARGET_B)
+#capturing both
+
+#testing
+pred_rf_2a_t <- predict(rf_2a, data = Tst_data)
+mean(pred_rf_2a_t$predictions == Tst_data$TARGET_B)
+#94.1
+table(pred_rf_2a_t$predictions, Tst_data$TARGET_B)
+#capturing both but 1 quite less
+summary(rf_2a)
+confusion_matrix_rf_2a <- rf_2a$confusion.matrix
+
+library(ROCR)
+pred_rf_2a_t_new=prediction(as.numeric(pred_rf_2a_t$predictions),as.numeric(Tst_data$TARGET_B))
+aucPerf_gbmM2 <-performance(pred_rf_2a_t_new, "tpr", "fpr")
+plot(aucPerf_gbmM2) + abline(a=0, b= 1)
+
+# x <- as.numeric(pred_rf_2a_t_new$predictions)
+# library(pROC)
+# auc(x, Tst_data$TARGET_B)
+#0.5088
+
+#lift chart
+# pred_rf_2a_t_lift <-performance(pred_rf_2a_t_new, "lift", "rpp")
+# plot(pred_rf_2a_t_lift)
+```
+
+# Tuning Random Forest on undersampled data
+```{r}
+rf_3 <- ranger(as.factor(TARGET_B)~., data = underSamp, num.trees = 600, mtry= 5,importance= "permutation")
+summary(rf_3)
+pred_rf_3 <- predict(rf_3, data = underSamp)
+confusion_matrix_rf_3 <- rf_3$confusion.matrix
+
+mean(pred_rf_3$predictions == underSamp$TARGET_B)
+#100%
+table(pred_rf_3$predictions, underSamp$TARGET_B)
+
+#testing
+pred_rf_3_t <- predict(rf_3, data = Tst_data)
+mean(pred_rf_3_t$predictions == Tst_data$TARGET_B)
+#94.5%
+table(pred_rf_3_t$predictions, Tst_data$TARGET_B)
+#capturing both but 1 quite less
+summary(rf_2a)
+confusion_matrix_rf_2a <- rf_2a$confusion.matrix
+#no difference
+```
+
+# Building Random Forest on balanced sampled data 
+```{r}
+library(ranger)
+#On balanced sampled data
+rf_3_a <- ranger(as.factor(TARGET_B)~., data = BalSamp, num.trees = 100, mtry = 10, importance= "permutation")
+summary(rf_3a)
+
+pred_rf_3_a <- predict(rf_3_a, data = BalSamp)
+confusion_matrix_rf_3_a <- rf_3_a$confusion.matrix
+
+mean(pred_rf_3_a$predictions == BalSamp$TARGET_B)
+#100%
+table(pred_rf_3_a$predictions, BalSamp$TARGET_B)
+
+#testing
+pred_rf_3_a_t <- predict(rf_3_a, data = Tst_data)
+mean(pred_rf_3_a_t$predictions == Tst_data$TARGET_B)
+#94.5
+table_rf_1_a = table(pred_rf_3a_t$predictions, Tst_data$TARGET_B)
+table_rf_1_a
+#Capturing both 
+```
+
+# Tunning Random Forest on balanced sample
+```{r}
+rf_3a <- ranger(as.factor(TARGET_B)~., data = BalSamp, num.trees = 600, mtry= 5, importance= "permutation",probability = TRUE)
+summary(rf_3a)
+pred_rf_3a <- predict(rf_3a, data = BalSamp)
+confusion_matrix_rf_3a <- rf_3a$confusion.matrix
+
+probabilities_rf_3a = predict(rf_3a, data = BalSamp)$predictions
+probabilities_rf_3a_1 <- ifelse(probabilities_rf_3a > 0.5,1,0)
+
+pred <- ifelse(probabilities_rf_3a_1[,1] == 1,0,1)
+mean(pred == BalSamp$TARGET_B)
+#100%
+table(pred, BalSamp$TARGET_B)
+
+#testing
+pred_rf_3a_t1 <- predict(rf_3a, data = Tst_data)$predictions
+prob_rf_3a_t1 <- ifelse(pred_rf_3a_t1 > 0.5, 1, 0)
+pred_t1 <- ifelse(prob_rf_3a_t1[,1] == 1, 0 , 1)
+mean(pred_t1 == Tst_data$TARGET_B)
+#94.6
+table(pred_t1, Tst_data$TARGET_B)
+#both
+```
+
+# Building Random Forest on over sampled data
+```{r}
+#On over sampled data
+rf_4a <- ranger(as.factor(TARGET_B)~., data = overSamp, num.trees = 100, importance= "permutation")
+summary(rf_4a)
+pred_rf_4a <- predict(rf_4a, data = overSamp)
+confusion_matrix_rf_4a <- rf_4a$confusion.matrix
+mean(pred_rf_4a$predictions == overSamp$TARGET_B)
+#100
+table(pred_rf_4a$predictions, overSamp$TARGET_B)
+
+#testing
+pred_rf_4a_t <- predict(rf_4a, data = Tst_data)
+mean(pred_rf_4a_t$predictions == Tst_data$TARGET_B)
+#94.69
+table(pred_rf_4a_t$predictions, Tst_data$TARGET_B)
+
+#library(ROCR)
+#pred_rf_4a_t_new=prediction(as.numeric(pred_rf_4a_t$predictions), as.numeric(Tst_data$TARGET_B))
+#pred_rf_4a_t_new=prediction( as.numeric(Tst_data$TARGET_B),as.numeric(pred_rf_4a_t$predictions))
+
+#aucPerf_gbmM4 <-performance(pred_rf_4a_t_new, "tpr", "fpr")
+#plot(aucPerf_gbmM4) + abline(a=0, b= 1)
+
+#library(pROC)
+#auc(Tst_data$TARGET_B,pred_rf_4a_t$predictions)
+#0.504
+
+#pred_rf_4a_t_lift <-performance(pred_rf_4a_t_new, "lift", "rpp")
+#plot(pred_rf_4a_t_lift)
+```
+
+# Developing GBM model on under sampled data 
+```{r}
+library(gbm)
+library(ROCR)
+#developing gbm model from undersampled training data
+gbm.fit_us <- gbm(
+  formula = TARGET_B ~ .,
+  distribution = "bernoulli",
+  data = underSamp,
+  n.trees = 200,
+  interaction.depth = 2,
+  shrinkage = 0.05,
+  cv.folds = 3,
+  n.cores = 16, 
+  verbose = FALSE
+  ) 
+#choosing best iteration
+bestIter_us<-gbm.perf(gbm.fit_us, method='cv')
+summary(gbm.fit_us)
+
+sqrt(min(gbm.fit_us$cv.error))
+#0.995
+gbm.perf(gbm.fit_us, method = "cv")
+#182
+
+#predictions for train gbm
+underSamp1 <- underSamp
+underSamp1$TARGET_B <- as.factor(underSamp1$TARGET_B)
+
+Scores_gbm_us<- predict(gbm.fit_us, newdata=underSamp1, n.tree= bestIter_us, type="response")
+pred_gbm_us=prediction(Scores_gbm_us, underSamp$TARGET_B)
+
+Scores_gbm_us_f <- ifelse(Scores_gbm_us>0.2,1,0)
+table_us_1<-table(Scores_gbm_us_f, underSamp$TARGET_B)
+#both
+mean(Scores_gbm_us_f==underSamp$TARGET_B)
+#62
+
+#predictions for test gbm
+Scores_gbm_us_tst<- predict(gbm.fit_us, newdata=Tst_data, n.tree= bestIter_us, type="response")
+pred_gbm_us=prediction(Scores_gbm_us_tst, Tst_data$TARGET_B)
+Scores_gbm_us_tst_f <- ifelse(Scores_gbm_us_tst>0.2,1,0)
+table_us_01<-table(Scores_gbm_us_tst_f, Tst_data$TARGET_B)
+#both
+mean(Scores_gbm_us_tst_f==Tst_data$TARGET_B)
+#61
+
+#ROC curve
+aucPerf_gbm_us <-performance(pred_gbm_us, "tpr", "fpr")
+plot(aucPerf_gbm_us) 
+abline(a=0, b= 1)
+
+#AUC
+aucPerf=performance(pred_gbm_us, "auc")
+aucPerf@y.values
+#0.61
+
+#Lift chart
+liftPerf_gbm_us <-performance(pred_gbm_us, "lift", "rpp")
+plot(liftPerf_gbm_us)
+```
+
+# Tuning GBM parameters for undersampled data
+```{r}
+#developing gbm model from undersampled training data
+gbm.fit_us_1 <- gbm(
+    formula = TARGET_B ~ .,
+  distribution = "bernoulli",
+  data = underSamp,
+  n.trees = 500,
+  interaction.depth = 3,
+  shrinkage = 0.001,
+  cv.folds = 5,
+  n.cores = 16, 
+  verbose = FALSE
+  ) 
+#choosing best iteration
+bestIter_us_1<-gbm.perf(gbm.fit_us_1, method='cv')
+summary(gbm.fit_us_1)
+
+sqrt(min(gbm.fit_us_1$cv.error))
+#0.995
+gbm.perf(gbm.fit_us_1, method = "cv")
+#1000
+
+#predictions for train gbm
+Scores_gbm_us_1<- predict(gbm.fit_us_1, newdata=underSamp, n.tree= bestIter_us_1, type="response")
+pred_gbm_us_1=prediction(Scores_gbm_us_1, underSamp$TARGET_B)
+
+Scores_gbm_us_f_1 <- ifelse(Scores_gbm_us_1>0.5,1,0)
+table_us<-table(Scores_gbm_us_f_1, underSamp$TARGET_B)
+table_us
+#all predicted as zero
+mean(Scores_gbm_us_f_1==underSamp$TARGET_B)
+#79.9
+
+#predictions for test gbm
+Scores_gbm_us_tst_1<- predict(gbm.fit_us_1, newdata=Tst_data, n.tree= bestIter_us_1, type="response")
+pred_gbm_us_1=prediction(Scores_gbm_us_tst_1, Tst_data$TARGET_B)
+Scores_gbm_us_tst_f_1 <- ifelse(Scores_gbm_us_tst_1>0.5,1,0)
+table_us_1<-table(Scores_gbm_us_tst_f_1, Tst_data$TARGET_B)
+#all zero
+mean(Scores_gbm_us_tst_f_1==Tst_data$TARGET_B)
+#94.7
+
+#ROC curve
+aucPerf_gbm_us_1 <-performance(pred_gbm_us_1, "tpr", "fpr")
+plot(aucPerf_gbm_us_1) 
+abline(a=0, b= 1)
+
+#AUC
+aucPerf=performance(pred_gbm_us_1, "auc")
+aucPerf@y.values
+#0.606
+
+#Lift chart
+liftPerf_gbm_us_1 <-performance(pred_gbm_us_1, "lift", "rpp")
+plot(liftPerf_gbm_us_1)
+```
+
+# Developing GBM model from oversampled training data
+```{r}
+gbm.fit_os <- gbm(
+  formula = TARGET_B ~ .,
+  distribution = "bernoulli",
+  data = overSamp,
+    n.trees = 200,
+  interaction.depth = 2,
+  shrinkage = 0.05,
+  cv.folds = 3,
+  n.cores = 16, 
+  verbose = FALSE
+  ) 
+#choosing best iteration
+bestIter_os<-gbm.perf(gbm.fit_os, method='cv') 
+
+#predictions for train gbm
+Scores_gbm_os<- predict(gbm.fit_os, newdata=overSamp, n.tree= bestIter_os, type="response")
+pred_gbm_os=prediction(Scores_gbm_os, overSamp$TARGET_B)
+Scores_gbm_os_f <- ifelse(Scores_gbm_os>0.5,1,0)
+table_os_1<-table(Scores_gbm_os_f, overSamp$TARGET_B)
+#capturing both 0 and 1
+mean(Scores_gbm_os_f==overSamp$TARGET_B)
+#63.3%
+
+#predictions for test gbm
+Scores_gbm_os_tst <- predict(gbm.fit_os, newdata=Tst_data, n.tree= bestIter_os, type="response")
+pred_gbm_os=prediction(Scores_gbm_os_tst, Tst_data$TARGET_B)
+Scores_gbm_os_tst_f <- ifelse(Scores_gbm_os_tst>0.5,1,0)
+table_os_01<-table(Scores_gbm_os_tst_f, Tst_data$TARGET_B)
+#capturing both 0 and 1
+mean(Scores_gbm_os_tst_f==Tst_data$TARGET_B)
+#84.4%
+
+#ROC curve
+aucPerf_gbm_os <-performance(pred_gbm_os, "tpr", "fpr")
+plot(aucPerf_gbm_os) 
+abline(a=0, b= 1)
+
+#AUC
+aucPerf=performance(pred_gbm_os, "auc")
+aucPerf@y.values
+#0.61
+#Lift curve
+liftPerf_gbm_os <-performance(pred_gbm_os, "lift", "rpp")
+plot(liftPerf_gbm_os)
+```
+
+# Developing GBM model from balanced training data
+```{r}
+#developing gbm model from balanced training data
+gbm.fit_bs <- gbm(
+  formula = TARGET_B ~ .,
+  distribution = "bernoulli",
+  data = BalSamp,
+  n.trees = 200,
+  interaction.depth = 4,
+  shrinkage = 0.05,
+  cv.folds = 4,
+  n.cores = 16, 
+  verbose = FALSE
+  ) 
+#choosing best iteration
+bestIter_bs<-gbm.perf(gbm.fit_bs, method='cv') 
+
+#predictions for train gbm
+Scores_gbm_bs<- predict(gbm.fit_bs, newdata=BalSamp, n.tree= bestIter_bs, type="response")
+pred_gbm_bs=prediction(Scores_gbm_bs, BalSamp$TARGET_B)
+Scores_gbm_bs_f <- ifelse(Scores_gbm_bs>0.5,1,0)
+table_bs_0<-table(Scores_gbm_bs_f, BalSamp$TARGET_B)
+mean(Scores_gbm_bs_f==BalSamp$TARGET_B)
+#63.9
+
+#predictions for test gbm
+Scores_gbm_bs_tst<- predict(gbm.fit_bs, newdata=Tst_data, n.tree= bestIter_bs, type="response")
+pred_gbm_bs_tst =prediction(Scores_gbm_bs_tst, Tst_data$TARGET_B)
+Scores_gbm_bs_tst_f <- ifelse(Scores_gbm_bs_tst>0.5,1,0)
+table_bs_01<-table(pred = Scores_gbm_bs_tst_f, true = Tst_data$TARGET_B)
+#both
+mean(Scores_gbm_bs_tst_f==Tst_data$TARGET_B)
+#61%
+
+#ROC curve
+aucPerf_gbm_bs <-performance(pred_gbm_bs_tst, "tpr", "fpr")
+plot(aucPerf_gbm_bs) 
+abline(a=0, b= 1)
+
+#AUC
+aucPerf=performance(pred_gbm_bs_tst, "auc")
+aucPerf@y.values
+#0.607
+
+#Lift curve
+liftPerf_gbm_bs <-performance(pred_gbm_bs_tst, "lift", "rpp")
+plot(liftPerf_gbm_bs)
+```
+
+# Tuning GBM parameters for balanced data
+```{r}
+gbm.fit_bs_1 <- gbm(
+  formula = TARGET_B ~ .,
+  distribution = "bernoulli",
+  data = BalSamp,
+  n.trees = 1000,
+  interaction.depth = 4,
+  shrinkage = 0.001,
+  cv.folds = 5,
+  n.cores = 16, 
+  verbose = FALSE
+  ) 
+#choosing best iteration
+bestIter_bs_1<-gbm.perf(gbm.fit_bs_1, method='cv') 
+
+#predictions for train gbm
+Scores_gbm_bs_01<- predict(gbm.fit_bs_1, newdata=BalSamp, n.tree= bestIter_bs_1, type="response")
+pred_gbm_bs_1=prediction(Scores_gbm_bs_01, BalSamp$TARGET_B)
+Scores_gbm_bs_f_01 <- ifelse(Scores_gbm_bs_01>0.5,1,0)
+table_bs_1<-table(Scores_gbm_bs_f_01, BalSamp$TARGET_B)
+mean(Scores_gbm_bs_f_01==BalSamp$TARGET_B)
+#59.4% accuarcy
+
+#predictions for test gbm
+Scores_gbm_bs_tst_01<- predict(gbm.fit_bs_1, newdata=Tst_data, n.tree= bestIter_bs_1, type="response")
+pred_gbm_bs_tst_1 =prediction(Scores_gbm_bs_tst_01, Tst_data$TARGET_B)
+Scores_gbm_bs_tst_f_01 <- ifelse(Scores_gbm_bs_tst_01>0.5,1,0)
+table_bs_2<-table(pred=Scores_gbm_bs_tst_f_01, true=Tst_data$TARGET_B)
+#both
+mean(Scores_gbm_bs_tst_f_01==Tst_data$TARGET_B)
+#58.8%
+
+#ROC curve
+aucPerf_gbm_bs_1 <-performance(pred_gbm_bs_tst_1, "tpr", "fpr")
+plot(aucPerf_gbm_bs_1) 
+abline(a=0, b= 1)
+
+#AUC
+aucPerf_1=performance(pred_gbm_bs_tst_1, "auc")
+aucPerf@y.values
+#0.61
+
+#Lift curve
+liftPerf_gbm_bs_1 <-performance(pred_gbm_bs_tst_1, "lift", "rpp")
+plot(liftPerf_gbm_bs_1)
+#we increased number of trees, changed shrinkage to 0.001, cv.fold to 5. The performance accuracy on test is almost same but the true positives are quite a bit.
+```
+# The End part 1
+
+# Part 2 - Building profit matrix for all gbm models on balanced sample data
+
+## Model gbm.fit_bs 
+
+```{r}
+#Adjusting probability scores of Model gbm.fit_bs
+p = Scores_gbm_bs_tst
+b = 0.5
+b1 = length(which(Tst_data$TARGET_B==1))/(nrow(Tst_data))
+for (i in length(Scores_gbm_bs_tst)){
+  #5.2 % minority class
+  p1 = b1*((p-p*b)/(b-p*b + b1*p - b*b1))
+}
+#taking threshold as equal to response rate
+p1_new <- ifelse(p1 > 0.052,1,0)
+table_bs_01_new<-table(pred = p1_new, true = Tst_data$TARGET_B)
+mean(p1_new==Tst_data$TARGET_B)
+
+confusion_profit_gbm <- table_bs_01_new
+confusion_profit_gbm[2,2] <- confusion_profit_gbm[2,2]*(12.32)
+confusion_profit_gbm[2,1] <- confusion_profit_gbm[2,1]*(-0.68)
+confusion_profit_gbm[1,1] <- confusion_profit_gbm[1,1]*(0)
+confusion_profit_gbm[1,2] <- confusion_profit_gbm[1,2]*(0)
+confusion_profit_gbm
+Total_benefit_gbm <- confusion_profit_gbm[2,2]+(confusion_profit_gbm[2,1])
+Total_benefit_gbm
+# profit is 2772.8
+
+#Profit Curve
+PROFITVAL <- 12.32
+COSTVAL <- -0.68
+Scores_gbm_bs_tst_1 <- data.frame(p1)
+profit_dataframe_gbm <- cbind(Scores_gbm_bs_tst_1, TARGET_B=Tst_data$TARGET_B)
+profit_dataframe_gbm = profit_dataframe_gbm[order(profit_dataframe_gbm$p1, decreasing = TRUE),] 
+profit_dataframe_gbm$profit <- ifelse(profit_dataframe_gbm$TARGET_B == '1',PROFITVAL, COSTVAL)
+profit_dataframe_gbm$cumProfit <- cumsum(profit_dataframe_gbm$profit)
+plot(profit_dataframe_gbm$p1,profit_dataframe_gbm$cumProfit, type="l", main = "Profit with Probability", xlab = "Probability of TARGET_B", ylab= "cumulative profit" )
+
+#get threshold
+th_gbm <- profit_dataframe_gbm$p1[which(profit_dataframe_gbm$cumProfit == max(profit_dataframe_gbm$cumProfit))]
+#threshold is 0.055
+
+#changing threshold in predictions to get max revenue
+prob_gbm1 <- ifelse(p1 > th_gbm,1,0)
+table_bs_01_th<-table(pred = prob_gbm1, true = Tst_data$TARGET_B)
+mean(prob_gbm1==Tst_data$TARGET_B) #65%
+#recalculating revenue based on max threshold
+confusion_profit_gbm_th <- table_bs_01_th
+confusion_profit_gbm_th[2,2] <- confusion_profit_gbm_th[2,2]*(12.32)
+confusion_profit_gbm_th[2,1] <- confusion_profit_gbm_th[2,1]*(-0.68)
+confusion_profit_gbm_th[1,1] <- confusion_profit_gbm_th[1,1]*(0)
+confusion_profit_gbm_th[1,2] <- confusion_profit_gbm_th[1,2]*(0)
+confusion_profit_gbm_th
+Total_benefit_gbm_th <- confusion_profit_gbm_th[2,2]+(confusion_profit_gbm_th[2,1])
+Total_benefit_gbm_th
+#max revenue from this model is 2924.56
+```
+
+## Model gbm.fit_bs_1(This model is best in terms of revenue as can be seen below)
+```{r}
+#Adjusting probability scores of Model gbm.fit_bs_1
+p = Scores_gbm_bs_tst_01
+b = 0.5
+b1 = length(which(Tst_data$TARGET_B==1))/(nrow(Tst_data))
+for (i in length(p)){
+  #5.2 % minority class
+  p1_gbm = b1*((p-p*b)/(b-p*b + b1*p - b*b1))
+}
+#taking threshold as equal to response rate
+p1_new_gbm2 <- ifelse(p1_gbm > 0.052,1,0)
+table_bs_01_new<-table(pred = p1_new_gbm2, true = Tst_data$TARGET_B)
+mean(p1_new_gbm2==Tst_data$TARGET_B)# acc 58.8%
+
+confusion_profit_gbm <- table_bs_01_new
+confusion_profit_gbm[2,2] <- confusion_profit_gbm[2,2]*(12.32)
+# confusion_profit_gbm[1,2] <- confusion_profit_gbm[1,2]*(-0.68)
+confusion_profit_gbm[2,1] <- confusion_profit_gbm[2,1]*(-0.68)
+confusion_profit_gbm[1,1] <- confusion_profit_gbm[1,1]*(0)
+confusion_profit_gbm[1,2] <- confusion_profit_gbm[1,2]*(0)
+confusion_profit_gbm
+Total_benefit_gbm <- confusion_profit_gbm[2,2]+(confusion_profit_gbm[2,1])
+Total_benefit_gbm # profit is 2987.12
+
+#Profit Curve
+PROFITVAL <- 12.32
+COSTVAL <- -0.68
+Scores_gbm_bs_tst_1 <- data.frame(p1_gbm)
+profit_dataframe_1 <- cbind(Scores_gbm_bs_tst_1, TARGET_B=Tst_data$TARGET_B)
+profit_dataframe_1 = profit_dataframe_1[order(profit_dataframe_1$p1_gbm, decreasing = TRUE),] 
+profit_dataframe_1$profit <- ifelse(profit_dataframe_1$TARGET_B == '1',PROFITVAL, COSTVAL)
+profit_dataframe_1$cumProfit <- cumsum(profit_dataframe_1$profit)
+plot(profit_dataframe_1$p1,profit_dataframe_1$cumProfit, type="l", main = "Profit with Probability", xlab = "Probability of TARGET_B", ylab= "cumulative profit" )
+
+#get threshold, threshold is 0.050
+th_gbm <- profit_dataframe_1$p1[which(profit_dataframe_1$cumProfit == max(profit_dataframe_1$cumProfit))]
+
+#changing threshold in predictions to get max revenue
+prob_gbm2 <- ifelse(p1 > th_gbm,1,0)
+table_bs_01_th<-table(pred = prob_gbm2, true = Tst_data$TARGET_B)
+mean(prob_gbm2==Tst_data$TARGET_B) #56%
+
+#recalculating revenue based on max threshold
+confusion_profit_gbm_th <- table_bs_01_th
+confusion_profit_gbm_th[2,2] <- confusion_profit_gbm_th[2,2]*(12.32)
+confusion_profit_gbm_th[2,1] <- confusion_profit_gbm_th[2,1]*(-0.68)
+confusion_profit_gbm_th[1,1] <- confusion_profit_gbm_th[1,1]*(0)
+confusion_profit_gbm_th[1,2] <- confusion_profit_gbm_th[1,2]*(0)
+confusion_profit_gbm_th
+Total_benefit_gbm_th <- confusion_profit_gbm_th[2,2]+(confusion_profit_gbm_th[2,1])
+Total_benefit_gbm_th
+
+#max revenue from this model is 3029.8. This is the maximum reveunue we are getting thus model gbm.fit_bs_1 is the best model
+```
+
+# Building profit matrix for best model of ridge on balanced sample data
+## Model name LR_model_ridge_bs_1
+```{r}
+#Building profit matrix for best model of ridge on balanced sample data
+#Adjusting probability scores of Model Ridge_model_2_1 
+p = probabilities_1_tst
+b = 0.5
+b1 = length(which(Tst_data$TARGET_B==1))/(nrow(Tst_data))
+for (i in length(p)){
+  #5.2 % minority class
+  p1_ridge = b1*((p-p*b)/(b-p*b + b1*p - b*b1))
+}
+#taking threshold as equal to response rate
+p1_new_ridge2 <- ifelse(p1_ridge > 0.052,1,0)
+table_bs_01_ridge_new<-table(pred = p1_new_ridge2, true = Tst_data$TARGET_B)
+mean(p1_new_ridge2==Tst_data$TARGET_B)
+#85.23%
+
+confusion_profit_ridge <- table_bs_01_ridge_new
+confusion_profit_ridge[2,2] <- confusion_profit_ridge[2,2]*(12.32)
+# confusion_profit_gbm[1,2] <- confusion_profit_gbm[1,2]*(-0.68)
+confusion_profit_ridge[2,1] <- confusion_profit_ridge[2,1]*(-0.68)
+confusion_profit_ridge[1,1] <- confusion_profit_ridge[1,1]*(0)
+confusion_profit_ridge[1,2] <- confusion_profit_ridge[1,2]*(0)
+confusion_profit_ridge
+Total_benefit_ridge <- confusion_profit_ridge[2,2]+(confusion_profit_ridge[2,1])
+Total_benefit_ridge
+# profit is 1469.24
+
+#Profit Curve
+PROFITVAL <- 12.32
+COSTVAL <- -0.68
+Scores_ridge_bs_tst_1 <- data.frame(p1_ridge)
+profit_dataframe_ridge <- cbind(Scores_ridge_bs_tst_1, TARGET_B=Tst_data$TARGET_B)
+profit_dataframe_ridge <- as.data.frame(profit_dataframe_ridge)
+str(profit_dataframe_ridge)
+
+profit_dataframe_ridge = profit_dataframe_ridge[order(profit_dataframe_ridge[,1], decreasing = TRUE),] 
+profit_dataframe_ridge$profit <- ifelse(profit_dataframe_ridge$TARGET_B == '1',PROFITVAL, COSTVAL)
+profit_dataframe_ridge$cumProfit <- cumsum(profit_dataframe_ridge$profit)
+plot(profit_dataframe_ridge[,1],profit_dataframe_ridge$cumProfit, type="l", main = "Profit with Probability", xlab = "Probability of TARGET_B", ylab= "cumulative profit" )
+
+#get threshold
+th_ridge <- profit_dataframe_r[,1][which(profit_dataframe_ridge$cumProfit == max(profit_dataframe_ridge$cumProfit))]
+#threshold is 0.0075
+
+#changing threshold in predictions to get max revenue
+prob_ridge2 <- ifelse(profit_dataframe_ridge[,1] > th_ridge,1,0)
+table_bs_01_ridge_th<-table(pred = prob_ridge2, true = Tst_data$TARGET_B)
+mean(prob_ridge2==Tst_data$TARGET_B)
+#66.14%
+#recalculating revenue based on max threshold
+confusion_profit_ridge_th <- table_bs_01_ridge_th
+confusion_profit_ridge_th[2,2] <- confusion_profit_ridge_th[2,2]*(12.32)
+confusion_profit_ridge_th[2,1] <- confusion_profit_ridge_th[2,1]*(-0.68)
+confusion_profit_ridge_th[1,1] <- confusion_profit_ridge_th[1,1]*(0)
+confusion_profit_ridge_th[1,2] <- confusion_profit_ridge_th[1,2]*(0)
+confusion_profit_ridge_th
+Total_benefit_ridge_th <- confusion_profit_ridge_th[2,2]+(confusion_profit_ridge_th[2,1])
+Total_benefit_ridge_th
+#revenue -58.64
+```
+
+# Building profit matrix for best model of lasso on balanced sample data
+```{r}
+#Building profit matrix for best model of lasso on balanced sample data
+#Adjusting probability scores of Model LASSO_model2 
+p = prob_LASS_tst
+b = 0.5
+b1 = length(which(Tst_data$TARGET_B==1))/(nrow(Tst_data))
+for (i in length(p)){
+  #5.2 % minority class
+  p1_lasso = b1*((p-p*b)/(b-p*b + b1*p - b*b1))
+}
+#taking threshold as equal to response rate
+p1_new_lasso2 <- ifelse(p1_lasso > 0.052,1,0)
+table_bs_01_lasso_new<-table(pred = p1_new_lasso2, true = Tst_data$TARGET_B)
+mean(p1_new_lasso2==Tst_data$TARGET_B)
+#85.13%
+confusion_profit_lasso <- table_bs_01_lasso_new
+confusion_profit_lasso[2,2] <- confusion_profit_lasso[2,2]*(12.32)
+# confusion_profit_gbm[1,2] <- confusion_profit_gbm[1,2]*(-0.68)
+confusion_profit_lasso[2,1] <- confusion_profit_lasso[2,1]*(-0.68)
+confusion_profit_lasso[1,1] <- confusion_profit_lasso[1,1]*(0)
+confusion_profit_lasso[1,2] <- confusion_profit_lasso[1,2]*(0)
+confusion_profit_lasso
+Total_benefit_lasso <- confusion_profit_lasso[2,2]+(confusion_profit_lasso[2,1])
+Total_benefit_lasso
+# profit is 1506.36
+
+#Profit Curve
+PROFITVAL <- 12.32
+COSTVAL <- -0.68
+Scores_lasso_bs_tst_1 <- data.frame(p1_lasso)
+profit_dataframe_lasso <- cbind(Scores_lasso_bs_tst_1, TARGET_B=Tst_data$TARGET_B)
+profit_dataframe_lasso <- as.data.frame(profit_dataframe_lasso)
+str(profit_dataframe_lasso)
+
+profit_dataframe_lasso = profit_dataframe_lasso[order(profit_dataframe_lasso[,1], decreasing = TRUE),] 
+profit_dataframe_lasso$profit <- ifelse(profit_dataframe_lasso$TARGET_B == '1',PROFITVAL, COSTVAL)
+profit_dataframe_lasso$cumProfit <- cumsum(profit_dataframe_lasso$profit)
+plot(profit_dataframe_lasso[,1],profit_dataframe_lasso$cumProfit, type="l", main = "Profit with Probability", xlab = "Probability of TARGET_B", ylab= "cumulative profit" )
+
+#get threshold
+th_lasso <- profit_dataframe_lasso[,1][which(profit_dataframe_lasso$cumProfit == max(profit_dataframe_lasso$cumProfit))]
+#threshold is 0.0030
+
+#changing threshold in predictions to get max revenue
+prob_lasso2 <- ifelse(profit_dataframe_lasso[,1] > th_lasso,1,0)
+table_bs_01_lasso_th<-table(pred = prob_lasso2, true = Tst_data$TARGET_B)
+mean(prob_lasso2==Tst_data$TARGET_B)
+#61.86%
+#recalculating revenue based on max threshold
+confusion_profit_lasso_th <- table_bs_01_lasso_th
+confusion_profit_lasso_th[2,2] <- confusion_profit_lasso_th[2,2]*(12.32)
+confusion_profit_lasso_th[2,1] <- confusion_profit_lasso_th[2,1]*(-0.68)
+confusion_profit_lasso_th[1,1] <- confusion_profit_lasso_th[1,1]*(0)
+confusion_profit_lasso_th[1,2] <- confusion_profit_lasso_th[1,2]*(0)
+confusion_profit_lasso_th
+Total_benefit_lasso_th <- confusion_profit_lasso_th[2,2]+(confusion_profit_lasso_th[2,1])
+Total_benefit_lasso_th
+#revenue 16.28
+
+```
+
+# Building profit matrix for best model of ranger on balanced sample data
+```{r}
+#Adjusting probability scores of Model rf_3a  
+pred_rf_3a_t1 <- pred_rf_3a_t1[,2]
+length(pred_rf_3a_t1)
+p = pred_rf_3a_t1
+b = 0.5
+b1 = length(which(Tst_data$TARGET_B==1))/(nrow(Tst_data))
+for (i in length(p)){
+  #5.2 % minority class
+  p1_rf = b1*((p-p*b)/(b-p*b + b1*p - b*b1))
+}
+#taking threshold as equal to response rate
+p1_new_rf2 <- ifelse(p1_rf > 0.052,1,0)
+table_bs_01_rf_new<-table(pred = p1_new_rf2, true = Tst_data$TARGET_B)
+mean(p1_new_rf2==Tst_data$TARGET_B)
+#94.58%
+
+confusion_profit_rf <- table_bs_01_rf_new
+confusion_profit_rf[2,2] <- confusion_profit_rf[2,2]*(12.32)
+# confusion_profit_gbm[1,2] <- confusion_profit_gbm[1,2]*(-0.68)
+confusion_profit_rf[2,1] <- confusion_profit_rf[2,1]*(-0.68)
+confusion_profit_rf[1,1] <- confusion_profit_rf[1,1]*(0)
+confusion_profit_rf[1,2] <- confusion_profit_rf[1,2]*(0)
+confusion_profit_rf
+Total_benefit_rf <-confusion_profit_rf[2,2]+(confusion_profit_rf[2,1])
+Total_benefit_rf
+# profit is 5.08
+
+#Profit Curve
+PROFITVAL <- 12.32
+COSTVAL <- -0.68
+Scores_rf_bs_tst_1 <- data.frame(p1_rf)
+profit_dataframe_rf <- cbind(Scores_rf_bs_tst_1, TARGET_B=Tst_data$TARGET_B)
+profit_dataframe_rf <- as.data.frame(profit_dataframe_rf)
+profit_dataframe_rf = profit_dataframe_rf[order(profit_dataframe_rf[,1], decreasing = TRUE),] 
+profit_dataframe_rf$profit <- ifelse(profit_dataframe_rf$TARGET_B == '1',PROFITVAL, COSTVAL)
+profit_dataframe_rf$cumProfit <- cumsum(profit_dataframe_rf$profit)
+plot(profit_dataframe_rf[,1],profit_dataframe_rf$cumProfit, type="l", main = "Profit with Probability", xlab = "Probability of TARGET_B", ylab= "cumulative profit" )
+
+#get threshold
+th_rf <- profit_dataframe_rf[,1][which(profit_dataframe_rf$cumProfit == max(profit_dataframe_rf$cumProfit))]
+#threshold is 0.0103
+
+#changing threshold in predictions to get max revenue
+prob_rf2 <- ifelse(profit_dataframe_rf[,1] > th_rf,1,0)
+table_bs_01_rf_th<-table(pred = prob_rf2, true = Tst_data$TARGET_B)
+mean(prob_rf2==Tst_data$TARGET_B)
+#56.07%
+
+#recalculating revenue based on max threshold
+confusion_profit_rf_th <- table_bs_01_rf_th
+confusion_profit_rf_th[2,2] <- confusion_profit_rf_th[2,2]*(12.32)
+confusion_profit_rf_th[2,1] <- confusion_profit_rf_th[2,1]*(-0.68)
+confusion_profit_rf_th[1,1] <- confusion_profit_rf_th[1,1]*(0)
+confusion_profit_rf_th[1,2] <- confusion_profit_rf_th[1,2]*(0)
+confusion_profit_rf_th
+Total_benefit_rf_th <- confusion_profit_rf_th[2,2]+(confusion_profit_rf_th[2,1])
+Total_benefit_rf_th
+#revenue -5.36
+```
+# GBM model(gbm.fit_bs_1) is most profitable with revenue 3029.8 and threshold 0.050
+# Calibrating probability scores
+```{r}
+#calibration probability scores of best model of GBM
+#applying isotoni regression calibration which is based on pair-adjacent violators (PAV) algorithm
+
+library(caret)
+library(CORElearn)
+actual_tst_targetb = unlist(Tst_data$TARGET_B)
+
+#calibration of testing scores
+scores_gbm_pred = unlist(p1_gbm)
+isocb<-calibrate(as.numeric(actual_tst_targetb),as.numeric(scores_gbm_pred), class1=1, method="isoReg", assumeProbabilities= TRUE)
+Tst_data1 <-cbind(Tst_data, isoPredsGbm=applyCalibration(scores_gbm_pred, isocb))
+plot(calibration(as.factor(Tst_data$TARGET_B)~ scores_gbm_pred + isoPredsGbm, data=Tst_data1))
+#isotonice regression is not calibrating testing scores at all
+
+#calibration of training scores
+actual_trn_targetb = unlist(BalSamp$TARGET_B)
+scores_gbm_pred1 = unlist(Scores_gbm_bs_01)
+isocb<-calibrate(as.numeric(actual_trn_targetb),as.numeric(scores_gbm_pred1), class1=2, method="isoReg", assumeProbabilities= TRUE)
+BalSamp1 <-cbind(BalSamp, isoPredsGbm=applyCalibration(scores_gbm_pred1, isocb))
+plot(calibration(as.factor(actual_trn_targetb)~ scores_gbm_pred1 + isoPredsGbm, data=BalSamp1))
+```
+
+# Platt scaling for calibration
+```{r}
+#calibrating testing scores of gbm
+psModel<-glm(actual_tst_targetb ~ scores_gbm_pred, data=Tst_data, family = binomial)
+psPred<-predict(psModel, Tst_data, type="response")
+Tst_data2<-cbind(Tst_data, psPreds=psPred)
+plot(calibration(as.factor(actual_tst_targetb)~ scores_gbm_pred + psPreds, data=Tst_data2),fill = colors(distinct = TRUE),main = "Calibration Plot")
+#blue is calibrated and pink is actual
+
+#calibrating training scores of gbm
+actual_trn_targetb = unlist(BalSamp$TARGET_B)
+scores_gbm_pred1 = unlist(Scores_gbm_bs_01)
+psModel1<-glm(actual_trn_targetb ~ scores_gbm_pred1, data=BalSamp, family = binomial)
+psPred1<-predict(psModel1,BalSamp, type="response")
+BalSamp2<-cbind(BalSamp, psPreds=psPred1)
+plot(calibration(as.factor(actual_trn_targetb)~ scores_gbm_pred1 + psPreds, data=BalSamp2),fill = colors(distinct = TRUE),main = "Calibration Plot")
+# Better results by platt scaling, therefore taking these scores for further work
+```
+
+# Data prep for TARGET_D Models
+```{r}
+CONTROLN <- Originaldata$CONTROLN
+TARGET_D <- Originaldata$TARGET_D
+data_new <- cbind(data_combined, CONTROLN, TARGET_D)
+
+set.seed(100)
+nr<-nrow(data_new)
+trnIndex<- sample(1:nr, size = round(0.7*nr), replace=FALSE)
+Trn_data3 <- data_new[trnIndex, ]
+Tst_data3 <- data_new[-trnIndex, ]
+
+set.seed(100)
+#balancing class with 50% each class
+BalSamp_new <- ovun.sample(TARGET_B ~., data=as.data.frame(Trn_data3), na.action = na.pass, method = "both", p=0.5)$data
+BalSamp_new %>% group_by(TARGET_B) %>% count()
+
+#add prob scores given by platt scaling as a column to training data
+Target_B_pred <- BalSamp2$psPreds
+BalSamp_new <- cbind(BalSamp_new,Target_B_pred)
+#add prob scores as a column to testing data
+Target_B_pred_tst <- Tst_data2$psPreds
+Tst_data3 <- cbind(Tst_data3,Target_B_pred_tst)
+colnames(Tst_data3)[colnames(Tst_data3) == "Target_B_pred_tst"] <- "Target_B_pred"
+
+#This is test prob of LS ridge best model
+probabilities_1_tst
+probabilities_1_trn #train
+
+#This is test prob of LS LASSO best model
+prob_LASS_trn
+prob_LASS_tst
+
+#This is test prob of rf best model
+probabilities_rf_3a[,2]
+pred_rf_3a_t1[,2]
+
+#calibrating these 3 prob scores
+library(caret)
+library(CORElearn)
+actual_tst_targetb = unlist(Tst_data$TARGET_B)
+
+#calibration of scores ridge
+scores_ridge_pred_t = unlist(probabilities_1_tst)
+
+psModel_LR_t <-glm(actual_tst_targetb ~ scores_ridge_pred_t, data=Tst_data, family = binomial)
+psPred_LR_t<-predict(psModel_LR_t, Tst_data, type="response")
+Tst_data_LR_t <-cbind(Tst_data, psPreds=psPred_LR_t)
+plot(calibration(as.factor(actual_tst_targetb)~ scores_ridge_pred_t + psPreds, data=Tst_data_LR_t),fill = colors(distinct = TRUE),main = "Calibration Plot")
+#blue is calibrated and pink is actual
+
+scores_ridge_pred = unlist(probabilities_1_trn)
+actual_trn_targetb <- BalSamp$TARGET_B
+psModel_LR <-glm(actual_trn_targetb ~ scores_ridge_pred, data=BalSamp, family = binomial)
+psPred_LR<-predict(psModel_LR, BalSamp, type="response")
+BalSamp_LR <-cbind(BalSamp, psPreds=psPred_LR)
+plot(calibration(as.factor(actual_trn_targetb)~ scores_ridge_pred + psPreds, data=BalSamp_LR),fill = colors(distinct = TRUE),main = "Calibration Plot")
+
+#calibration of scores LASSO
+scores_LASS_pred_t = unlist(prob_LASS_tst)
+psModel_LASS_t <-glm(actual_tst_targetb ~ scores_LASS_pred_t, data=Tst_data, family = binomial)
+psPred_LASS_t<-predict(psModel_LASS_t, Tst_data, type="response")
+Tst_data_LASS_t <-cbind(Tst_data, psPreds=psPred_LASS_t)
+plot(calibration(as.factor(actual_tst_targetb)~ scores_LASS_pred_t + psPreds, data=Tst_data_LASS_t),fill = colors(distinct = TRUE),main = "Calibration Plot")
+
+scores_LASS_pred = unlist(prob_LASS_trn)
+actual_trn_targetb <- BalSamp$TARGET_B
+psModel_LASS <-glm(actual_trn_targetb ~ scores_LASS_pred, data=BalSamp, family = binomial)
+psPred_LASS<-predict(psModel_LASS, BalSamp, type="response")
+BalSamp_LASS <-cbind(BalSamp, psPreds=psPred_LASS)
+plot(calibration(as.factor(actual_trn_targetb)~ scores_LASS_pred + psPreds, data=BalSamp_LASS),fill = colors(distinct = TRUE),main = "Calibration Plot")
+
+#calibration of scores rf
+scores_rf_pred_t = unlist(pred_rf_3a_t1[,2])
+psModel_rf_t <-glm(actual_tst_targetb ~ scores_rf_pred_t, data=Tst_data, family = binomial)
+psPred_rf_t<-predict(psModel_rf_t, Tst_data, type="response")
+Tst_data_rf_t <-cbind(Tst_data, psPreds=psPred_rf_t)
+plot(calibration(as.factor(actual_tst_targetb)~ scores_rf_pred_t + psPreds, data=Tst_data_rf_t),fill = colors(distinct = TRUE),main = "Calibration Plot")
+
+scores_rf_pred = unlist(probabilities_rf_3a[,2])
+actual_trn_targetb <- BalSamp$TARGET_B
+psModel_rf <-glm(actual_trn_targetb ~ scores_rf_pred, data=BalSamp, family = binomial)
+psPred_rf<-predict(psModel_rf, BalSamp, type="response")
+BalSamp_rf <-cbind(BalSamp, psPreds=psPred_rf)
+plot(calibration(as.factor(actual_trn_targetb)~ scores_rf_pred + psPreds, data=BalSamp_rf),fill = colors(distinct = TRUE),main = "Calibration Plot")
+
+# GBM Pred Target variable name is "Target_B_pred", for Ridge "psPred_LR", for Lasso "psPred_LASS", for RF "psPred_rf"
+BalSamp_new <- cbind(BalSamp_new, psPred_LR, psPred_LASS, psPred_rf)
+
+#add prob scores as a column to testing data
+Tst_data3 <- cbind(Tst_data3, psPred_LR_t, psPred_LASS_t, psPred_rf_t)
+
+colnames(Tst_data3)[colnames(Tst_data3) == "psPred_LR_t"] <- "psPred_LR"
+colnames(Tst_data3)[colnames(Tst_data3) == "psPred_LASS_t"] <- "psPred_LASS"
+colnames(Tst_data3)[colnames(Tst_data3) == "psPred_rf_t"] <- "psPred_rf"
+
+#stacking balsamp_new and Tst_data3 to make 1 dataset
+data_combined_new <- rbind(BalSamp_new,Tst_data3)
+
+#Filter at TARGET_B ==1
+data_combined_f <- data_combined_new %>% filter(TARGET_B == "1") 
+#removing duplicate rows which occured because of balancing the dataset
+data_combined_f1 <- data_combined_f[!duplicated(data_combined_f[,"CONTROLN"]),]
+
+#checking outliers & removing it
+boxplot(data_combined_f1$TARGET_D)
+outliers <- boxplot(data_combined_f1$TARGET_D, plot=FALSE)$out
+data_combined_f2 <- data_combined_f1[-which(data_combined_f1$TARGET_D %in% outliers),]
+
+#removing TARGET_B original now 
+data_combined_f2 <- data_combined_f2 %>% select(-c("TARGET_B"))
+#removing CONTROLN and other models pred added in previous step for variable selection and modelling
+data_combined_f3 <- data_combined_f2 %>% select(-c("CONTROLN", "psPred_LR", "psPred_LASS", "psPred_rf"))
+```
+
+# Variable Selection for TARGET_D model data
+```{r}
+set.seed(100)
+nr<-nrow(data_combined_f3)
+trnIndex<- sample(1:nr, size = round(0.7*nr), replace=FALSE)
+Trn_data4 <- data_combined_f3[trnIndex, ]
+Tst_data4 <- data_combined_f3[-trnIndex, ]
+
+DT_varSelect1 <- rpart(TARGET_D~., data=Trn_data4, parms = list(split = "information"), control = rpart.control(cp=0.0001, minsplit = 30))
+
+Imp_var_DT1 <- DT_varSelect1$variable.importance
+length(Imp_var_DT1)
+
+#Evaluating performance on training
+pred_DT_varSelect1 = predict(DT_varSelect1,Trn_data4)
+DT_rmse_Trn <- mean((Trn_data4$TARGET_D- pred_DT_varSelect1)^2)
+#rmse 2.851
+#97.14% accuracy
+
+#Evaluating performance on testing
+pred_DT_varSelect2 = predict(DT_varSelect1,Tst_data4)
+DT_rmse_Tst <- mean((Tst_data4$TARGET_D- pred_DT_varSelect2)^2)
+#rmse 4.6 and thus 95.39% accuracy
+
+library(rpart.plot)
+# prp(DT_varSelect,type=2,extra=1)
+DT_varSelect1$variable.importance %>% View()
+barplot(t(DT_varSelect1$variable.importance),horiz=FALSE)
+Imp_var_DT_new <- data.frame(DT_varSelect1$variable.importance[1:100])
+selected_var_DT_new <- rownames(Imp_var_DT_new)
+```
+
+# Building Random Forest for variable selection
+```{r}
+library(ranger)
+rf_1_new <- ranger(as.factor(TARGET_D)~., data = Trn_data4, num.trees = 50, mtry = 139, importance= "impurity")
+summary(rf_1_new)
+Var_RF <- rf_1_new$variable.importance
+Var_RF <- data.frame(Var_RF)
+Var_RF$var <- rownames(Var_RF)
+
+rownames(Var_RF) <- c(1:418)
+colnames(Var_RF) <- c("Imp","Var")
+Var_RF = Var_RF[order(Var_RF$Imp, decreasing = TRUE),] 
+selected_var_RF_new = Var_RF$Var[1:100]
+```
+
+# Taking union of subsets selected from Decision Tree and Random Forest
+```{r}
+union_data_var_new <- union(selected_var_RF_new,selected_var_DT_new)
+union_data_new <- data_combined_f3 %>% select(union_data_var_new)
+#adding TARGET_D to union_data_new
+union_data_new$TARGET_D <- data_combined_f3$TARGET_D
+colnames(union_data_new)[colnames(union_data_new)=="data_combined_f3$Target_B_pred"] <- "Target_B_pred"
+
+#saving union data with unique identifier
+union_data_ID <- cbind(union_data_new,data_combined_f2$CONTROLN)
+colnames(union_data_ID)[colnames(union_data_ID)=="data_combined_f2$CONTROLN"] <- "CONTROLN"
+```
+
+#Making linear model to check p-values
+```{r}
+library(broom)
+lm_new <- lm(TARGET_D~., data = union_data_new)
+summary(lm_new)
+tm1 <- tidy(lm_new)
+signi_vars_new <- tm1$term[tm1$p.value < 0.05]
+signi_vars_new <- signi_vars_new[2:23]
+non_signi_var <- tm1$term[tm1$p.value >= 0.05]
+
+#26 variables are significant out of 140. 
+# Data for making pca, taking these 26 as it is in modelling and passing rest into PCA
+
+data_tobe_added <- union_data_new %>% select(signi_vars_new)
+data_pca_new <- union_data_new %>% select(non_signi_var)
+
+#Saving dataset with unique row identifier
+Data_uniqueID1 <- data.frame(data_pca_new,data_combined_f2$CONTROLN, data_combined_f2$Target_B_pred)
+```
+
+# PCA for final variable selection
+```{r}
+data_pca_new_f <- data.frame(data_pca_new)
+library(kernlab)
+library(purrr)
+PCA_comp1 <- prcomp(data_pca_new_f, scale = TRUE,center = TRUE)
+Components1 <- PCA_comp1$rotation
+#write.csv(data.frame(Components),file = 'D:/IDS 572/Assgn 2/PCA/components.csv',sep = ",")
+plot(PCA_comp1)
+
+screeplot(PCA_comp1, type = "l", npcs = 50, main = "Screeplot of PCs")
+abline(h = 1, col="red", lty=5)
+legend("topright", legend=c("Eigenvalue = 1"),
+       col=c("red"), lty=5, cex=0.6)
+
+#Thus, finalizing 10 PC
+
+var_after_PCA1 <- data.frame(as.matrix(data_pca_new_f) %*% as.matrix(Components1[,1:10]))
+
+Final_data <- cbind(var_after_PCA1,data_tobe_added,union_data_new$TARGET_D)
+colnames(Final_data)[colnames(Final_data)=="union_data_new$TARGET_D"] <- "TARGET_D"
+
+#Saving dataset with unique row identifier
+Data_uniqueID2 <- data.frame(Final_data,data_combined_f2$CONTROLN, data_combined_f2$Target_B_pred)
+
+#Adding these three scores to the Tst Data
+Data_uniqueID3 <- data.frame(Final_data,data_combined_f2$CONTROLN, data_combined_f2$Target_B_pred,data_combined_f2$psPred_rf, data_combined_f2$psPred_LASS, data_combined_f2$psPred_LR)
+```
+
+# Models for predicting TARGET_D
+# Linear Regression
+```{r}
+#splitting data
+set.seed(100)
+nr<-nrow(Final_data)
+trnIndex<- sample(1:nr, size = round(0.7*nr), replace=FALSE)
+Trn_data_D <- Final_data[trnIndex, ]
+Tst_data_D <- Final_data[-trnIndex, ]
+
+#splitting saved dataset also with same seeed and saving it
+set.seed(100)
+nr1<-nrow(Data_uniqueID2)
+trnIndex<- sample(1:nr1, size = round(0.7*nr1), replace=FALSE)
+Trn_data_D_ID <- Data_uniqueID2[trnIndex, ]
+Tst_data_D_ID <- Data_uniqueID2[-trnIndex, ]
+
+lm_new <- lm(TARGET_D~., data = Trn_data_D)
+summary(lm_new)
+Pred_Trn <- predict(lm_new, Trn_data_D)
+lm_Trn_rmse <- mean((Trn_data_D$TARGET_D- Pred_Trn)^2)
+#rmse 22.988
+Pred_Tst <- predict(lm_new, Tst_data_D)
+lm_Tst_rmse <- mean((Tst_data_D$TARGET_D- Pred_Tst)^2)
+#rmse 21.359
+```
+
+# Random Forest for predicting TARGET_D
+```{r}
+library(randomForest)
+rf_D <- randomForest(TARGET_D~., data = Trn_data_D, ntree = 100)
+summary(rf_D)
+plot(rf_D)
+#This plot shows the Error and the Number of Trees. We can easily notice that how the Error is dropping as we keep on adding more and more trees and average them.Not much decrease in error after 100-120 trees
+print(rf_D)
+
+#Select mtry value with minimum out of bag(OOB) error.
+mtry <- tuneRF(Trn_data_D[-16],Trn_data_D$TARGET_D, ntreeTry=100,
+               stepFactor=1.5,improve=0.01, trace=TRUE, plot=TRUE)
+best.m <- mtry[mtry[, 2] == min(mtry[, 2]), 1]
+print(mtry)
+print(best.m)
+#In this case, mtry = 27 is the best mtry as it has least OOB error
+
+#Build rf model again using best mtry value.
+set.seed(100)
+rf_D1 <-randomForest(TARGET_D~.,data=Trn_data_D, mtry=best.m, importance=TRUE,ntree=100)
+print(rf_D1)
+
+#Evaluating performance
+pred_rf_D1_Trn = predict(rf_D1, Trn_data_D, type = "response")
+rmse_rf_D1_Trn <- mean((Trn_data4$TARGET_D- pred_rf_D1_Trn)^2)
+#rmse 3.664
+pred_rf_D1_Tst = predict(rf_D1, Tst_data_D, type = "response")
+rmse_rf_D1_Tst <- mean((Tst_data4$TARGET_D- pred_rf_D1_Tst)^2)
+#rmse 20.109
+```
+
+# GBM for predicting TARGET_D
+```{r}
+set.seed(100)
+gbm_D <- gbm(
+  formula = TARGET_D ~ .,
+  distribution = "gaussian",
+  data = Trn_data_D,
+  n.trees = 1000,
+  interaction.depth = 4,
+  shrinkage = 0.001,
+  cv.folds = 5,
+  n.cores = 16, 
+  verbose = FALSE
+  ) 
+
+pred_gbm_Trn<- predict(gbm_D, Trn_data_D,type= "response")
+#rmse is 26.1858
+rmse_gbm_Trn <- mean((Trn_data_D$TARGET_D- pred_gbm_Trn)^2)
+pred_gbm_Tst <- predict(gbm_D, Tst_data_D,type= "response")
+rmse_gbm_Tst <- mean((Tst_data_D$TARGET_D- pred_gbm_Tst)^2)
+#rmse 23.55
+```
+
+# Combining results of best model of TARGET_B(GBM) with Linear model of TARGET_D
+```{r}
+#Combining testing results of GBM TARGET_B model and testing results of Linear model of TARGET_D
+#renaming some columns
+colnames(Tst_data_D_ID)[colnames(Tst_data_D_ID)=="data_combined_f2.CONTROLN"] <- "CONTROLN"
+colnames(Tst_data_D_ID)[colnames(Tst_data_D_ID)=="data_combined_f2.Target_B_pred"] <- "Target_B_pred"
+data1 <- data.frame(Tst_data_D_ID, Pred_Tst)
+colnames(data1)[colnames(data1)=="Pred_Tst"] <- "TARGET_D_pred"
+
+data1$Expected_Donation <- (data1$Target_B_pred)*(data1$TARGET_D_pred)
+#From testing dataset - Individuals to solicit will be those having Expected_Donation > 0.68 which is the cost of solicitation. Thus, below dataset contains the list of individual to target (CONTROLN) from the testing dataset
+data1_f <- data1 %>% filter(Expected_Donation > 0.68) 
+
+#Profit for testing set
+Profit_Tst_linear <- sum(data1_f$Expected_Donation) - nrow(data1_f)*0.68
+#Profit for testing is 6436.585
+
+#Combing training results of GBM TARGET_B model and training results of Linear model of TARGET_D
+
+#renaming some columns
+colnames(Trn_data_D_ID)[colnames(Trn_data_D_ID)=="data_combined_f2.CONTROLN"] <- "CONTROLN"
+colnames(Trn_data_D_ID)[colnames(Trn_data_D_ID)=="data_combined_f2.Target_B_pred"] <- "Target_B_pred"
+data2 <- data.frame(Trn_data_D_ID, Pred_Trn)
+colnames(data2)[colnames(data2)=="Pred_Trn"] <- "TARGET_D_pred"
+
+data2$Expected_Donation <- (data2$Target_B_pred)*(data2$TARGET_D_pred)
+data2_f <- data2 %>% filter(Expected_Donation > 0.68) 
+
+#Profit for training set is 15214.67
+Profit_Trn_linear <- sum(data2_f$Expected_Donation) - (nrow(data2_f)*0.68)
+
+#stacking individual to target from training and testing set combined(CONTROLN present)
+data_lm_target <- rbind(data1_f,data2_f)
+```
+
+# Combining results of best model of TARGET_B(GBM) with Random Forest of TARGET_D
+```{r}
+#Combining testing results of GBM TARGET_B model and testing results of random forest of TARGET_D
+
+data3 <- data.frame(Tst_data_D_ID, pred_rf_D1_Tst)
+colnames(data3)[colnames(data3)=="pred_rf_D1_Tst"] <- "TARGET_D_pred"
+
+data3$Expected_Donation <- (data3$Target_B_pred)*(data3$TARGET_D_pred)
+data3_f <- data3 %>% filter(Expected_Donation > 0.68) 
+
+Profit_Tst_rf <- sum(data3_f$Expected_Donation) - nrow(data3_f)*0.68
+#Profit for testing is 6421.299
+
+#Combing training results of GBM TARGET_B model and training results of random forest of TARGET_D
+
+data4 <- data.frame(Trn_data_D_ID, pred_rf_D1_Trn)
+colnames(data4)[colnames(data4)=="pred_rf_D1_Trn"] <- "TARGET_D_pred"
+data4$Expected_Donation <- (data4$Target_B_pred)*(data4$TARGET_D_pred)
+data4_f <- data4 %>% filter(Expected_Donation > 0.68) 
+
+#Profit for training set is 15237.98
+Profit_Trn_rf <- sum(data4_f$Expected_Donation) - (nrow(data4_f)*0.68)
+
+#stacking individual to target from training and testing set combined(CONTROLN present)
+data_rf_target <- rbind(data3_f,data4_f)
+```
+
+# Combining results of best model of TARGET_B(GBM) with GBM of TARGET_D
+```{r}
+#Combining testing results of GBM TARGET_B model and testing results of GBM of TARGET_D
+
+data5 <- data.frame(Tst_data_D_ID, pred_gbm_Tst)
+colnames(data5)[colnames(data5)=="pred_gbm_Tst"] <- "TARGET_D_pred"
+
+data5$Expected_Donation <- (data5$Target_B_pred)*(data5$TARGET_D_pred)
+data5_f <- data5 %>% filter(Expected_Donation > 0.68) 
+
+Profit_Tst_gbm <- sum(data5_f$Expected_Donation) - nrow(data5_f)*0.68
+#Profit for testing is 6488.072
+
+#Combing training results of GBM TARGET_B model and training results of GBM of TARGET_D
+
+data6 <- data.frame(Trn_data_D_ID, pred_gbm_Trn)
+colnames(data6)[colnames(data6)=="pred_gbm_Trn"] <- "TARGET_D_pred"
+data6$Expected_Donation <- (data6$Target_B_pred)*(data6$TARGET_D_pred)
+data6_f <- data6 %>% filter(Expected_Donation > 0.68) 
+
+#Profit for training set is 15294.09
+Profit_Trn_gbm <- sum(data6_f$Expected_Donation) - (nrow(data6_f)*0.68)
+
+#stacking individual to target from training and testing set combined(CONTROLN present)
+data_gbm_target <- rbind(data5_f,data6_f)
+```
+# On testing set, combination of GBM Target_B model with GBM Target_D model, RF Target_D model and Linear Target_D model has profit 6488.072, 6421.299 and 6436.585 respectively. Thus, GBM Target_B model with GBM Target_D model is giving the highest profit.
+
+# Reporting results on using the best response model from each method (as in part 1), with the single donation_amount model.
+
+```{r}
+# Taking 1 best model from each ridge, LASSO and RF (GBM combination already done above) models of Target_B and combining with best model of TARGET_D (Taking best as GBM). Thus, 3 combinations.
+
+# Logistic Regression with ridge's best model is LR_model_ridge_bs_1 (with acc 84 but capturing more 1s)
+
+#data1 has target D test data with pred 
+set.seed(100)
+nr<-nrow(data_combined_f2)
+trnIndex<- sample(1:nr, size = round(0.7*nr), replace=FALSE)
+Trn_data_br <- data_combined_f2[trnIndex, ]
+Tst_data_br <- data_combined_f2[-trnIndex, ]
+
+data_ed <- data.frame(data1,Tst_data_br$psPred_rf, Tst_data_br$psPred_LASS, Tst_data_br$psPred_LR)
+
+#Profit calculation for LR
+data_ed$Expected_Donation_LR <- (data_ed$Tst_data_br.psPred_LR)*(data_ed$TARGET_D_pred)
+data_ed_LR <- data_ed %>% filter(Expected_Donation_LR > 0.68) 
+#Profit for testing set of LR is 6450.807
+Profit_LR <- sum(data_ed_LR$Expected_Donation_LR) - (nrow(data_ed_LR)*0.68)
+
+#Profit calculation for LASSO
+data_ed$Expected_Donation_LASS <- (data_ed$Tst_data_br.psPred_LASS)*(data_ed$TARGET_D_pred)
+data_ed_LASS <- data_ed %>% filter(Expected_Donation_LASS > 0.68) 
+#Profit for testing set of LASSO is 6446.09
+Profit_LASS <- sum(data_ed_LASS$Expected_Donation_LASS) - (nrow(data_ed_LASS)*0.68)
+
+#Profit calculation for RF
+data_ed$Expected_Donation_rf <- (data_ed$Tst_data_br.psPred_rf)*(data_ed$TARGET_D_pred)
+data_ed_rf <- data_ed %>% filter(Expected_Donation_rf > 0.68) 
+#Profit for testing set of RF is 12794.26
+Profit_rf <- sum(data_ed_rf$Expected_Donation_rf) - (nrow(data_ed_rf)*0.68)
+
+#As per profit, the combination of RF(Target_B) and GBM(Target_D) on test data is giving the best results with profit of 12800 approx. Hence, GBM was helpful in predicting the continuous variable while RF helped to predicting response variable.
+```
