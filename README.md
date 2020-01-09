@@ -23,5 +23,5 @@ Here, I have develop a model to predict donation amount (TARGET_D) directly, and
 Steps included in the part 2-
 1. Identified the most profitable individuals to target using the response model with average donation & mailing costs information
 2. Develop a second model on TARGET_D, and combine this with the response model to identify the most profitable individuals to target
-3. well-calibrated probability scores before ‘combining’ the response and donation amount models
+3. Well-calibrated probability scores before ‘combining’ the response and donation amount models
 
